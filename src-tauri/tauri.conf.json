@@ -34,7 +34,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_WITH_OUTPUT_OF: tauri signer generate",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhEMUVGQjlCNTNBRTI2M0MKUldROEpxNVRtL3NlamFQRVdaZzlrSHFwREkrMGJ4K3BLbThITW5xb2czM3Z1M0M1cUVrRkJPWDQK",
       "endpoints": [
         "https://github.com/itsyashvardhan/careeros/releases/latest/download/latest.json"
       ]
