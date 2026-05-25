@@ -5136,14 +5136,20 @@ const JS_ASHBY_BOARDS = [
   { slug: "sierra", name: "Sierra AI" },
 ];
 
+// f_TPR=r86400 → last 24 h | f_E=1 → entry-level (0–1 yr) | f_E=2 → internship
 const JS_LINKEDIN_SEARCHES = [
   { keyword: "customer success associate", location: "India" },
   { keyword: "implementation consultant", location: "India" },
   { keyword: "prompt engineer AI", location: "India" },
-  { keyword: "customer onboarding entry level", location: "India" },
-  { keyword: "AI trainer fresher", location: "India" },
-  { keyword: "solutions engineer startup", location: "Bengaluru, India" },
-  { keyword: "business analyst fresher SaaS", location: "India" },
+  { keyword: "customer onboarding", location: "India" },
+  { keyword: "AI trainer", location: "India" },
+  { keyword: "solutions engineer", location: "Bengaluru, India" },
+  { keyword: "business analyst", location: "India" },
+  { keyword: "customer success associate", location: "Singapore" },
+  { keyword: "implementation consultant", location: "Singapore" },
+  { keyword: "AI specialist entry level", location: "Singapore" },
+  { keyword: "customer success", location: "Kuala Lumpur, Malaysia" },
+  { keyword: "customer success", location: "Jakarta, Indonesia" },
 ];
 
 const JS_INTERNSHALA_KEYWORDS = [
@@ -5151,16 +5157,16 @@ const JS_INTERNSHALA_KEYWORDS = [
 ];
 
 const JS_MANUAL_SEARCHES = [
-  { name: "Internshala — Customer Success", url: "https://internshala.com/internships/customer-success-internship", note: "Best fresher tech volume in India" },
-  { name: "Cutshort — CSA / IC / AI", url: "https://cutshort.io/jobs?q=customer+success&location=India&exp_max=2", note: "Skill-matched, startup-heavy" },
-  { name: "Wellfound — India AI startups", url: "https://wellfound.com/jobs?q=customer+success&l=India", note: "Funded startup roles, Series A–C" },
+  { name: "Internshala — Customer Success (24h)", url: "https://internshala.com/internships/customer-success-internship", note: "Best fresher tech volume in India" },
+  { name: "Cutshort — CSA / IC / AI (0–1 yr)", url: "https://cutshort.io/jobs?q=customer+success&location=India&exp_max=1", note: "Skill-matched, startup-heavy" },
+  { name: "Wellfound — India AI startups", url: "https://wellfound.com/jobs?q=customer+success&l=India&exp=0-1", note: "Funded startup roles, Series A–C" },
+  { name: "LinkedIn India — CSA (24h, entry)", url: "https://www.linkedin.com/jobs/search/?keywords=customer+success+associate&location=India&f_E=1%2C2&f_TPR=r86400", note: "Entry level, last 24 hours" },
+  { name: "LinkedIn India — Prompt Engineer (24h)", url: "https://www.linkedin.com/jobs/search/?keywords=prompt+engineer+AI&location=India&f_E=1%2C2&f_TPR=r86400", note: "AI roles, last 24 hours" },
+  { name: "LinkedIn Singapore — CSA (24h)", url: "https://www.linkedin.com/jobs/search/?keywords=customer+success&location=Singapore&f_E=1%2C2&f_TPR=r86400", note: "Entry level, last 24 hours" },
+  { name: "LinkedIn Malaysia — CSA (24h)", url: "https://www.linkedin.com/jobs/search/?keywords=customer+success&location=Malaysia&f_E=1%2C2&f_TPR=r86400", note: "Entry level, last 24 hours" },
+  { name: "LinkedIn Indonesia — CSA (24h)", url: "https://www.linkedin.com/jobs/search/?keywords=customer+success&location=Indonesia&f_E=1%2C2&f_TPR=r86400", note: "Entry level, last 24 hours" },
   { name: "Unstop — Jobs + Competitions", url: "https://unstop.com/jobs?oppType=jobs&query=customer+success", note: "Competitions convert to warm offers" },
-  { name: "YC Work at a Startup", url: "https://www.workatastartup.com/jobs?q=customer+success&role=cs&jobType=fulltime", note: "YC-backed India companies" },
-  { name: "iimjobs — BA / IC roles", url: "https://www.iimjobs.com/j/business-analyst-0-2-years", note: "Management + analytics firms" },
-  { name: "Instahyre — Customer Success", url: "https://www.instahyre.com/search-jobs/?q=customer+success&experience=0-2", note: "AI-matched, MNC India offices" },
-  { name: "LinkedIn India — CSA at AI/SaaS", url: "https://www.linkedin.com/jobs/search/?keywords=customer+success+associate&location=India&f_E=1%2C2&f_TPR=r604800", note: "Entry level, last 7 days" },
-  { name: "LinkedIn India — Prompt Engineer", url: "https://www.linkedin.com/jobs/search/?keywords=prompt+engineer+AI&location=India&f_E=1%2C2", note: "AI roles, entry level" },
-  { name: "LinkedIn India — Implementation", url: "https://www.linkedin.com/jobs/search/?keywords=implementation+consultant&location=India&f_E=1%2C2", note: "IC / onboarding roles" },
+  { name: "YC Work at a Startup", url: "https://www.workatastartup.com/jobs?q=customer+success&role=cs&jobType=fulltime", note: "YC-backed India/SG companies" },
 ];
 
 // ── state ──
@@ -5169,11 +5175,45 @@ let jsActiveSourceFilters = new Set();
 
 function jsSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+const JS_TARGET_GEOS = [
+  "india","bangalore","bengaluru","mumbai","delhi","hyderabad","pune","chennai","noida","gurgaon",
+  "singapore",
+  "malaysia","kuala lumpur","kl","penang",
+  "indonesia","jakarta","bandung",
+  "remote",
+];
+
+// Phrases that indicate >1 yr experience required
+const JS_EXP_NEGATIVE = [
+  "2+ year","3+ year","4+ year","5+ year","2 year","3 year","4 year","5 year",
+  "2+ yr","3+ yr","minimum 2","at least 2","at least 3",
+  "senior","lead","principal","staff","manager","director","vp","head of",
+];
+
 function jsPassesFilter(title) {
   const t = title.toLowerCase();
   if (!JS_TITLE_FILTER.positive.some(p => t.includes(p.toLowerCase()))) return false;
   if (JS_TITLE_FILTER.negative.some(n => t.includes(n.toLowerCase()))) return false;
   return true;
+}
+
+function jsPassesGeo(location) {
+  if (!location) return false; // no location = can't confirm target geo, exclude
+  const l = location.toLowerCase();
+  return JS_TARGET_GEOS.some(g => l.includes(g));
+}
+
+function jsPassesRecency(posted_at) {
+  if (!posted_at) return true; // no date available — keep (can't filter)
+  const posted = new Date(posted_at);
+  if (isNaN(posted.getTime())) return true;
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  return posted.getTime() >= cutoff;
+}
+
+function jsPassesExperience(title) {
+  const t = title.toLowerCase();
+  return !JS_EXP_NEGATIVE.some(e => t.includes(e.toLowerCase()));
 }
 
 function jsLog(msg, type = "info") {
@@ -5249,7 +5289,8 @@ async function jsFetchAshby(slug, companyName) {
 }
 
 async function jsFetchLinkedIn(keyword, location) {
-  const params = new URLSearchParams({ keywords: keyword, location, f_E: "1,2", start: "0" });
+  // f_E=1 = entry-level (0–1 yr), f_E=2 = internship; f_TPR=r86400 = last 24 h
+  const params = new URLSearchParams({ keywords: keyword, location, f_E: "1,2", f_TPR: "r86400", start: "0" });
   const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?${params}`;
   try {
     const r = await jsProxyFetch(url);
@@ -5346,13 +5387,19 @@ async function jsScannerRun() {
   jsSetProgress(tasks.length, tasks.length);
   jsLog(`Done. ${jsAllJobs.length} total raw jobs fetched.`, "ok");
 
-  const filtered = jsAllJobs.filter(j => jsPassesFilter(j.title));
+  const rawCount = jsAllJobs.length;
+  const filtered = jsAllJobs.filter(j =>
+    jsPassesFilter(j.title) &&
+    jsPassesExperience(j.title) &&
+    jsPassesGeo(j.location) &&
+    jsPassesRecency(j.posted_at)
+  );
   const seen = new Set();
   const unique = filtered.filter(j => {
     const k = `${j.title.toLowerCase()}|${j.company.toLowerCase()}`;
     if (seen.has(k)) return false; seen.add(k); return true;
   });
-  jsLog(`${unique.length} unique jobs pass title filter.`, "ok");
+  jsLog(`${rawCount} raw → ${filtered.length} geo+recency+exp filtered → ${unique.length} unique.`, "ok");
 
   const st = document.getElementById("js-statTotal"); if (st) st.textContent = jsAllJobs.length;
   const sf = document.getElementById("js-statFiltered"); if (sf) sf.textContent = unique.length;
