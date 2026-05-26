@@ -80,12 +80,9 @@ jobs:
             | macOS Intel | `CareerOS-*-macOS-x64.dmg` | |
             | Linux | `CareerOS-*-Linux-x64.AppImage` | |
             | Linux | `CareerOS-*-Linux-x64.deb` | |
-            | Android | `CareerOS-*-Android.apk` | |
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
-
-      # ── Rename artifacts to friendly names and re-upload ──────────────────
 
       - name: Rename Windows artifacts
         if: matrix.platform == 'windows-latest'
@@ -147,133 +144,5 @@ jobs:
           if [ -n "$deb" ]; then
             dest="CareerOS-${ver}-Linux-x64.deb"
             cp "$deb" "$dest"
-            gh release upload "$TAG" "$dest" --clobber
-          fi
-
-  # ── Android ────────────────────────────────────────────────────────────────
-  release-android:
-    permissions:
-      contents: write
-    runs-on: ubuntu-22.04
-    needs: release-desktop
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust + Android targets
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-
-      - name: Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Android SDK + NDK
-        uses: android-actions/setup-android@v3
-
-      - run: sdkmanager "ndk;27.0.12077973"
-
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
-
-      - name: Init Android project
-        env:
-          NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
-          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
-        run: cargo tauri android init
-
-      - name: Build Android APK
-        env:
-          NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
-          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-        run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > /tmp/careeros.keystore
-            export TAURI_ANDROID_KEYSTORE=/tmp/careeros.keystore
-            export TAURI_ANDROID_KEYSTORE_PASSWORD="$STORE_PASSWORD"
-            export TAURI_ANDROID_KEY_ALIAS="$KEY_ALIAS"
-            export TAURI_ANDROID_KEY_PASSWORD="$KEY_PASSWORD"
-          fi
-          cargo tauri android build --apk
-
-      - name: Upload renamed APK
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          ver="${TAG#v}"
-          apk=$(find src-tauri/gen/android/app/build/outputs/apk/universal/release -name "*.apk" 2>/dev/null | head -1)
-          if [ -n "$apk" ]; then
-            dest="CareerOS-${ver}-Android.apk"
-            cp "$apk" "$dest"
-            gh release upload "$TAG" "$dest" --clobber
-          fi
-
-  # ── iOS ────────────────────────────────────────────────────────────────────
-  release-ios:
-    permissions:
-      contents: write
-    runs-on: macos-latest
-    needs: release-desktop
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust + iOS targets
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
-
-      - name: Import Apple certificate
-        if: env.APPLE_CERTIFICATE != ''
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          KEYCHAIN_PASSWORD: ci-keychain-pass
-        run: |
-          echo "$APPLE_CERTIFICATE" | base64 --decode > /tmp/cert.p12
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security import /tmp/cert.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-
-      - name: Init iOS project
-        run: cargo tauri ios init
-
-      - name: Build iOS IPA
-        run: cargo tauri ios build --export-method app-store-connect 2>/dev/null || cargo tauri ios build
-
-      - name: Upload renamed IPA
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          ver="${TAG#v}"
-          ipa=$(find src-tauri/gen/apple/build/arm64 -name "*.ipa" 2>/dev/null | head -1)
-          if [ -n "$ipa" ]; then
-            dest="CareerOS-${ver}-iOS.ipa"
-            cp "$ipa" "$dest"
             gh release upload "$TAG" "$dest" --clobber
           fi
