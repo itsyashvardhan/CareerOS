@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "identifier": "com.careeros.app",
   "build": {
-    "frontendDist": "../"
+    "frontendDist": "../app"
   },
   "app": {
     "windows": [
