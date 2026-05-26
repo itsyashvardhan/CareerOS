@@ -2593,6 +2593,9 @@
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem; flex-wrap:wrap; gap:10px;">
     <h2 style="font-size:1.3rem; font-weight:700; color:var(--color-text-primary); margin:0;">Job Scanner</h2>
     <div style="display:flex; gap:8px; align-items:center;">
+      <button id="js-btnNotify" class="js-btn js-btn-ghost" onclick="jsToggleNotifications(this)" title="Get desktop alerts when new listings are found">
+        🔔 Notify off
+      </button>
       <button id="js-btnExportCSV" class="js-btn js-btn-ghost" style="display:none" onclick="jsScannerExportCSV()">Export CSV</button>
       <button id="js-btnExportJSON" class="js-btn js-btn-ghost" style="display:none" onclick="jsScannerExportJSON()">Export JSON</button>
       <button id="js-btnScan" class="js-btn js-btn-primary" onclick="jsScannerRun()">Run Scan</button>
@@ -5455,9 +5458,60 @@ function jsToggleExpChip(mode, btn) {
 function jsToggleLiveApi(btn) {
   jsLiveApiOnly = !jsLiveApiOnly;
   btn.classList.toggle("active", jsLiveApiOnly);
-  // Live API mode: re-run scan; cached mode: just re-render existing results
   if (jsLiveApiOnly && jsAllJobs.length === 0) jsScannerRun();
   else jsScannerRender();
+}
+
+// ── Push notification toggle ──
+let jsNotificationsEnabled = false;
+let jsSeenJobKeys = new Set(); // dedupe: title|company already notified
+
+async function jsToggleNotifications(btn) {
+  if (jsNotificationsEnabled) {
+    jsNotificationsEnabled = false;
+    btn.textContent = "🔔 Notify off";
+    btn.classList.remove("active");
+    return;
+  }
+  if (!("Notification" in window)) {
+    alert("Desktop notifications are not supported in this view.");
+    return;
+  }
+  const perm = Notification.permission === "granted"
+    ? "granted"
+    : await Notification.requestPermission();
+  if (perm !== "granted") {
+    alert("Notification permission denied. Please allow notifications for this app.");
+    return;
+  }
+  jsNotificationsEnabled = true;
+  btn.textContent = "🔔 Notify on";
+  btn.classList.add("active");
+  // Seed seen keys from current results so we only alert on NEW findings
+  jsAllJobs.forEach(j => jsSeenJobKeys.add(`${j.title.toLowerCase()}|${j.company.toLowerCase()}`));
+}
+
+function jsNotifyNewJobs(jobs) {
+  if (!jsNotificationsEnabled) return;
+  const fresh = jobs.filter(j => {
+    const k = `${j.title.toLowerCase()}|${j.company.toLowerCase()}`;
+    if (jsSeenJobKeys.has(k)) return false;
+    jsSeenJobKeys.add(k);
+    return true;
+  });
+  if (fresh.length === 0) return;
+  if (fresh.length === 1) {
+    const j = fresh[0];
+    new Notification(`New listing: ${j.title}`, {
+      body: `${j.company} · ${j.location || "Location TBD"}`,
+      icon: "",
+    });
+  } else {
+    new Notification(`${fresh.length} new job listings found`, {
+      body: fresh.slice(0, 3).map(j => `${j.title} @ ${j.company}`).join("\n"),
+      icon: "",
+    });
+  }
 }
 
 function jsSetProgress(done, total) {
@@ -5639,6 +5693,7 @@ async function jsScannerRun() {
   jsAllJobs = unique;
   jsBuildSourceChips(sources);
   jsScannerRender();
+  jsNotifyNewJobs(unique);
 
   const ec = document.getElementById("js-btnExportCSV"); if (ec) ec.style.display = "";
   const ej = document.getElementById("js-btnExportJSON"); if (ej) ej.style.display = "";
