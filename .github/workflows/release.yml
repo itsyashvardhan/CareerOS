@@ -101,13 +101,6 @@ jobs:
             gh release upload $env:TAG $dest --clobber
           }
 
-          $msi = Get-ChildItem "$src/msi" -Filter "*.msi" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($msi) {
-            $dest = "CareerOS-$ver-Windows-x64.msi"
-            Copy-Item $msi.FullName $dest
-            gh release upload $env:TAG $dest --clobber
-          }
-
       - name: Rename macOS artifacts
         if: matrix.platform == 'macos-latest'
         env:
@@ -146,3 +139,100 @@ jobs:
             cp "$deb" "$dest"
             gh release upload "$TAG" "$dest" --clobber
           fi
+
+  # ── Finalize updater: sign bundles + generate latest.json ──────────────────
+  finalize-updater:
+    needs: release-desktop
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.ref_name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install tauri-cli
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Download update bundles from release
+        run: |
+          mkdir -p dist
+          cd dist
+          gh release download "$TAG" --pattern "*.nsis.zip*" --skip-existing 2>/dev/null || true
+          gh release download "$TAG" --pattern "*.app.tar.gz*" --skip-existing 2>/dev/null || true
+          gh release download "$TAG" --pattern "*.AppImage.tar.gz*" --skip-existing 2>/dev/null || true
+          ls -la
+
+      - name: Sign any unsigned update bundles
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          echo "$TAURI_SIGNING_PRIVATE_KEY" > /tmp/tauri.key
+          cd dist
+          for f in *.nsis.zip *.app.tar.gz *.AppImage.tar.gz; do
+            [ -f "$f" ] || continue
+            [ -f "${f}.sig" ] && { echo "  already signed: $f"; continue; }
+            echo "  signing: $f"
+            cargo tauri signer sign \
+              --private-key-path /tmp/tauri.key \
+              --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
+              "$f"
+          done
+          rm -f /tmp/tauri.key
+
+      - name: Upload any new .sig files
+        run: |
+          cd dist
+          for sig in *.sig; do
+            [ -f "$sig" ] || continue
+            gh release upload "$TAG" "$sig" --clobber
+          done
+
+      - name: Generate and upload latest.json
+        run: |
+          ver="${TAG#v}"
+          pub_date=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+          base_url="https://github.com/itsyashvardhan/CareerOS/releases/download/${TAG}"
+          cd dist
+
+          platforms="{}"
+
+          win=$(ls *.nsis.zip 2>/dev/null | grep -v '\.sig$' | head -1)
+          if [ -n "$win" ] && [ -f "${win}.sig" ]; then
+            sig=$(cat "${win}.sig")
+            platforms=$(echo "$platforms" | jq --arg u "$base_url/$win" --arg s "$sig" \
+              '. + {"windows-x86_64": {"url":$u,"signature":$s}}')
+          fi
+
+          mac_arm=$(ls 2>/dev/null *.app.tar.gz | grep -i aarch64 | head -1)
+          if [ -n "$mac_arm" ] && [ -f "${mac_arm}.sig" ]; then
+            sig=$(cat "${mac_arm}.sig")
+            platforms=$(echo "$platforms" | jq --arg u "$base_url/$mac_arm" --arg s "$sig" \
+              '. + {"darwin-aarch64": {"url":$u,"signature":$s}}')
+          fi
+
+          mac_x64=$(ls 2>/dev/null *.app.tar.gz | grep -i x86_64 | head -1)
+          if [ -n "$mac_x64" ] && [ -f "${mac_x64}.sig" ]; then
+            sig=$(cat "${mac_x64}.sig")
+            platforms=$(echo "$platforms" | jq --arg u "$base_url/$mac_x64" --arg s "$sig" \
+              '. + {"darwin-x86_64": {"url":$u,"signature":$s}}')
+          fi
+
+          lin=$(ls 2>/dev/null *.AppImage.tar.gz | grep -v '\.sig$' | head -1)
+          if [ -n "$lin" ] && [ -f "${lin}.sig" ]; then
+            sig=$(cat "${lin}.sig")
+            platforms=$(echo "$platforms" | jq --arg u "$base_url/$lin" --arg s "$sig" \
+              '. + {"linux-x86_64": {"url":$u,"signature":$s}}')
+          fi
+
+          echo "$platforms" | jq \
+            --arg v "v$ver" --arg d "$pub_date" \
+            '{"version":$v,"notes":"","pub_date":$d,"platforms":.}' > latest.json
+          cat latest.json
+          gh release upload "$TAG" latest.json --clobber

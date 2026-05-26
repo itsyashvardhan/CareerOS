@@ -3326,6 +3326,14 @@ document.addEventListener("DOMContentLoaded", () => {
     handleBookmarkletRedirect();
     loadEnvKeys(); // fire-and-forget — updates keys when .env resolves
 
+    // Listen for update-available event from Tauri backend
+    if (window.__TAURI__?.event) {
+      window.__TAURI__.event.listen("update-available", (ev) => {
+        const version = ev.payload || "a new version";
+        showUpdateToast(version);
+      });
+    }
+
     startOctopusEngine();
     setTimeout(() => octoShowBubble("> ready.\n> let's get you hired.", 3500), 200);
 
@@ -3963,6 +3971,36 @@ function showToast(message, isClaude = false) {
   setTimeout(() => {
     toast.classList.remove("show");
   }, 4000);
+}
+
+function showUpdateToast(version) {
+  const existing = document.getElementById("update-toast");
+  if (existing) existing.remove();
+  const el = document.createElement("div");
+  el.id = "update-toast";
+  el.style.cssText = `
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:rgba(30,28,25,0.97); border:1px solid rgba(204,104,73,0.6);
+    border-radius:12px; padding:14px 20px; display:flex; align-items:center; gap:14px;
+    font-size:.85rem; color:var(--color-text-primary); z-index:9999;
+    box-shadow:0 8px 32px rgba(0,0,0,0.5); max-width:420px;
+  `;
+  el.innerHTML = `
+    <span>🚀 <strong>CareerOS ${version}</strong> is available</span>
+    <button onclick="doInstallUpdate()" style="padding:6px 14px; border-radius:8px; background:var(--accent-indigo); color:#fff; border:none; font-size:.82rem; cursor:pointer; white-space:nowrap;">Update & Restart</button>
+    <button onclick="this.parentElement.remove()" style="background:none; border:none; color:var(--color-text-muted); cursor:pointer; font-size:1rem; line-height:1; padding:0 4px;">✕</button>
+  `;
+  document.body.appendChild(el);
+}
+
+async function doInstallUpdate() {
+  const btn = document.querySelector("#update-toast button");
+  if (btn) { btn.textContent = "Installing…"; btn.disabled = true; }
+  try {
+    await window.__TAURI__.core.invoke("install_update");
+  } catch (e) {
+    showToast("Update failed: " + e);
+  }
 }
 
 // Core compilation logic
@@ -4798,12 +4836,13 @@ async function searchJobs() {
     "jobs.gusto.com"
   ];
 
-  // Broader aggregator domains for supplemental results
+  // Broader aggregator domains for supplemental results (no LinkedIn — ATS-direct covers those)
   const aggregatorDomains = [
-    "linkedin.com",
     "lever.co",
     "greenhouse.io",
-    "ashbyhq.com"
+    "ashbyhq.com",
+    "workatastartup.com",
+    "wellfound.com"
   ];
 
   try {
@@ -5325,11 +5364,6 @@ const JS_MANUAL_SEARCHES = [
   { name: "Internshala — Customer Success (24h)", url: "https://internshala.com/internships/customer-success-internship", note: "Best fresher tech volume in India" },
   { name: "Cutshort — CSA / IC / AI (0–1 yr)", url: "https://cutshort.io/jobs?q=customer+success&location=India&exp_max=1", note: "Skill-matched, startup-heavy" },
   { name: "Wellfound — India AI startups", url: "https://wellfound.com/jobs?q=customer+success&l=India&exp=0-1", note: "Funded startup roles, Series A–C" },
-  { name: "LinkedIn India — CSA (24h, entry)", url: "https://www.linkedin.com/jobs/search/?keywords=customer+success+associate&location=India&f_E=1%2C2&f_TPR=r86400", note: "Entry level, last 24 hours" },
-  { name: "LinkedIn India — Prompt Engineer (24h)", url: "https://www.linkedin.com/jobs/search/?keywords=prompt+engineer+AI&location=India&f_E=1%2C2&f_TPR=r86400", note: "AI roles, last 24 hours" },
-  { name: "LinkedIn Singapore — CSA (24h)", url: "https://www.linkedin.com/jobs/search/?keywords=customer+success&location=Singapore&f_E=1%2C2&f_TPR=r86400", note: "Entry level, last 24 hours" },
-  { name: "LinkedIn Malaysia — CSA (24h)", url: "https://www.linkedin.com/jobs/search/?keywords=customer+success&location=Malaysia&f_E=1%2C2&f_TPR=r86400", note: "Entry level, last 24 hours" },
-  { name: "LinkedIn Indonesia — CSA (24h)", url: "https://www.linkedin.com/jobs/search/?keywords=customer+success&location=Indonesia&f_E=1%2C2&f_TPR=r86400", note: "Entry level, last 24 hours" },
   { name: "Unstop — Jobs + Competitions", url: "https://unstop.com/jobs?oppType=jobs&query=customer+success", note: "Competitions convert to warm offers" },
   { name: "YC Work at a Startup", url: "https://www.workatastartup.com/jobs?q=customer+success&role=cs&jobType=fulltime", note: "YC-backed India/SG companies" },
 ];
@@ -5337,6 +5371,21 @@ const JS_MANUAL_SEARCHES = [
 // ── state ──
 let jsAllJobs = [];
 let jsActiveSourceFilters = new Set();
+let jsSavedJobs = JSON.parse(localStorage.getItem("js_saved_jobs") || "[]");
+
+function jsToggleSave(key, title, company, url) {
+  const idx = jsSavedJobs.findIndex(j => j.key === key);
+  if (idx >= 0) {
+    jsSavedJobs.splice(idx, 1);
+    showToast("Removed from saved jobs.");
+  } else {
+    jsSavedJobs.unshift({ key, title, company, url, saved_at: new Date().toISOString() });
+    showToast("Saved for later! ✓");
+  }
+  localStorage.setItem("js_saved_jobs", JSON.stringify(jsSavedJobs));
+  // Re-render to update button state
+  jsScannerRender();
+}
 
 function jsSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -5650,13 +5699,6 @@ async function jsScannerRun() {
       jsAllJobs.push(...jobs);
       await jsSleep(300);
     }),
-    ...JS_LINKEDIN_SEARCHES.map(s => async () => {
-      jsLog(`LinkedIn: "${s.keyword}" in ${s.location}…`, "info");
-      const jobs = await jsFetchLinkedIn(s.keyword, s.location);
-      jsLog(`  ${jobs.length} jobs`, jobs.length ? "ok" : "warn");
-      jsAllJobs.push(...jobs);
-      await jsSleep(1500);
-    }),
     ...JS_INTERNSHALA_KEYWORDS.map(k => async () => {
       jsLog(`Internshala: ${k}…`, "info");
       const jobs = await jsFetchInternshala(k);
@@ -5757,7 +5799,15 @@ function jsScannerRender() {
     return;
   }
 
-  container.innerHTML = jobs.map(j => `
+  container.innerHTML = jobs.map(j => {
+    const key = `${j.title}|${j.company}|${j.url}`;
+    const saved = jsSavedJobs.some(s => s.key === key);
+    const saveLabel = saved ? "Saved ✓" : "Save";
+    const saveBg = saved ? "rgba(204,104,73,0.15)" : "rgba(255,255,255,0.02)";
+    const saveBorder = saved ? "rgba(204,104,73,0.4)" : "rgba(255,255,255,0.08)";
+    const saveColor = saved ? "var(--accent-indigo)" : "var(--color-text-muted)";
+    const keyEsc = jsEscHtml(key.replace(/'/g, "\\'"));
+    return `
     <div class="panel js-card" style="padding:14px; transition:border-color .15s;">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
         <div style="flex:1; min-width:0;">
@@ -5769,12 +5819,18 @@ function jsScannerRender() {
           <div style="color:var(--color-text-secondary); font-size:.78rem; margin-top:3px;">${jsEscHtml(j.company)}</div>
           ${j.location ? `<div style="color:var(--color-text-muted); font-size:.75rem; margin-top:2px;">${jsEscHtml(j.location)}</div>` : ""}
         </div>
-        ${j.url ? `<a href="${jsEscHtml(j.url)}" target="_blank" rel="noopener"
-            style="padding:6px 14px; border-radius:8px; border:1px solid rgba(247,244,235,0.1); color:var(--color-text-secondary); font-size:.78rem; white-space:nowrap; text-decoration:none; margin-top:2px; transition:border-color .15s;"
-            onmouseover="this.style.borderColor='var(--accent-indigo)'" onmouseout="this.style.borderColor='rgba(247,244,235,0.1)'">Apply →</a>` : ""}
+        <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end; margin-top:2px;">
+          ${j.url ? `<a href="${jsEscHtml(j.url)}" target="_blank" rel="noopener"
+              style="padding:6px 14px; border-radius:8px; border:1px solid rgba(247,244,235,0.1); color:var(--color-text-secondary); font-size:.78rem; white-space:nowrap; text-decoration:none; transition:border-color .15s;"
+              onmouseover="this.style.borderColor='var(--accent-indigo)'" onmouseout="this.style.borderColor='rgba(247,244,235,0.1)'">Apply →</a>` : ""}
+          <button onclick="jsToggleSave('${keyEsc}', '${jsEscHtml(j.title.replace(/'/g,"\\'"))}', '${jsEscHtml(j.company.replace(/'/g,"\\'"))}', '${jsEscHtml(j.url||"")}')"
+              style="padding:5px 10px; border-radius:8px; border:1px solid ${saveBorder}; background:${saveBg}; color:${saveColor}; font-size:.72rem; white-space:nowrap; cursor:pointer; transition:all .15s;">
+            ${saveLabel}
+          </button>
+        </div>
       </div>
-    </div>
-  `).join("");
+    </div>`;
+  }).join("");
 }
 
 function jsScannerExportCSV() {
