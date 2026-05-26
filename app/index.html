@@ -2237,8 +2237,11 @@
             </div>
             <div class="ide-header" style="border-top: 1px solid rgba(255, 255, 255, 0.06); border-bottom: none;">
               <div class="output-actions" style="width: 100%; margin-top: 0;">
+                <button class="btn btn-secondary" id="btn-gemini-generate" onclick="generateWithGemini()" style="background: rgba(66,133,244,0.12); border-color: rgba(66,133,244,0.35); color: #74aaff;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                  Generate with Gemini
+                </button>
                 <button class="btn btn-claude" onclick="runIt()">
-                  <!-- Inline Claude face brand mark -->
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
                     <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
                     <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
@@ -4123,6 +4126,69 @@ function runIt() {
     // Fallback if permission blocked
     window.open("https://claude.ai/new?incognito=", "_blank");
   });
+}
+
+async function generateWithGemini() {
+  if (!generatedPrompt) {
+    generate();
+    if (!generatedPrompt) return;
+  }
+  if (!geminiApiKey) {
+    showToast("Add your Gemini API key in Settings first.");
+    openSettings();
+    return;
+  }
+
+  const btn = document.getElementById("btn-gemini-generate");
+  const pre = document.getElementById("out-pre");
+  btn.disabled = true;
+  btn.textContent = "Generating…";
+
+  // Show streaming area — replace prompt text with Gemini response
+  document.getElementById("output-empty").style.display = "none";
+  document.getElementById("out-box").style.display = "block";
+  pre.textContent = "";
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${geminiApiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: generatedPrompt }] }] })
+      }
+    );
+    if (!res.ok) throw new Error(`Gemini ${res.status}`);
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const json = line.slice(6).trim();
+        if (json === "[DONE]") break;
+        try {
+          const chunk = JSON.parse(json);
+          const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          pre.textContent += text;
+          pre.scrollTop = pre.scrollHeight;
+        } catch (_) {}
+      }
+    }
+    showToast("Gemini response complete ✓");
+  } catch (e) {
+    pre.textContent = `Error: ${e.message}`;
+    showToast("Gemini failed: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>Generate with Gemini`;
+  }
 }
 
 // Action: Copy text to clipboard manually
