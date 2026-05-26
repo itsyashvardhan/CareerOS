@@ -1912,6 +1912,7 @@
     .job-board-badge.lever { background: rgba(255, 255, 255, 0.08); color: #f8fafc; }
     .job-board-badge.greenhouse { background: rgba(16, 185, 129, 0.15); color: #10b981; }
     .job-board-badge.other { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; }
+    .job-board-badge.pre-linkedin { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 700; }
 
     .job-meta-row {
       display: flex;
@@ -4685,37 +4686,72 @@ async function searchJobs() {
     query = `"${roleQuery}" entry level job ${countryObj.name} fresher OR "new grad" OR junior`;
   }
 
-  // Tavily-native domain filtering (replaces site: operators in query string)
-  const targetDomains = [
+  // ATS-direct domains — hit these before LinkedIn indexes them
+  const atsDomains = [
+    "boards.greenhouse.io",
+    "job-boards.greenhouse.io",
+    "jobs.lever.co",
+    "jobs.ashbyhq.com",
+    "apply.workable.com",
+    "jobs.smartrecruiters.com",
+    "workatastartup.com",
+    "jobs.rippling.com",
+    "recruitee.com",
+    "jobs.gusto.com"
+  ];
+
+  // Broader aggregator domains for supplemental results
+  const aggregatorDomains = [
     "linkedin.com",
     "lever.co",
     "greenhouse.io",
-    "ashbyhq.com",
-    "workatastartup.com"
+    "ashbyhq.com"
   ];
 
   try {
-    const response = await fetch("https://api.tavily.com/search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        api_key: tavilyApiKey,
-        query: query,
-        search_depth: "advanced",
-        max_results: 15,
-        days: 2,
-        include_domains: targetDomains
+    // Fire ATS-direct (12h window) and aggregator (48h) searches in parallel
+    const [atsResponse, aggregatorResponse] = await Promise.all([
+      fetch("https://api.tavily.com/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: tavilyApiKey,
+          query: query,
+          search_depth: "advanced",
+          max_results: 12,
+          days: 1,
+          include_domains: atsDomains
+        })
+      }),
+      fetch("https://api.tavily.com/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: tavilyApiKey,
+          query: query,
+          search_depth: "advanced",
+          max_results: 10,
+          days: 2,
+          include_domains: aggregatorDomains
+        })
       })
-    });
+    ]);
 
-    if (!response.ok) {
-      throw new Error(`Tavily responded with status ${response.status}`);
+    if (!atsResponse.ok) throw new Error(`Tavily ATS search failed: ${atsResponse.status}`);
+    if (!aggregatorResponse.ok) throw new Error(`Tavily aggregator search failed: ${aggregatorResponse.status}`);
+
+    const atsData = await atsResponse.json();
+    const aggregatorData = await aggregatorResponse.json();
+
+    // Tag ATS results as pre-LinkedIn, then merge + deduplicate by URL
+    const atsResults = (atsData.results || []).map(r => ({ ...r, _atsSource: true }));
+    const aggregatorResults = (aggregatorData.results || []);
+    const seenUrls = new Set();
+    const merged = [];
+    for (const r of [...atsResults, ...aggregatorResults]) {
+      if (!seenUrls.has(r.url)) { seenUrls.add(r.url); merged.push(r); }
     }
-
-    const data = await response.json();
-    const results = data.results || [];
+    const results = merged;
     
     // Process and filter results for entry-level match and 48 hours limits
     const filteredJobs = [];
@@ -4819,7 +4855,19 @@ function renderJobsList(jobs, roleTitle, countryName) {
 
     let boardClass = "other";
     let boardLabel = "External";
-    if (job.url.includes("linkedin.com")) {
+    if (job._atsSource) {
+      boardClass = "pre-linkedin";
+      if (job.url.includes("greenhouse.io")) boardLabel = "🔴 Greenhouse";
+      else if (job.url.includes("lever.co")) boardLabel = "🔴 Lever";
+      else if (job.url.includes("ashbyhq.com")) boardLabel = "🔴 Ashby";
+      else if (job.url.includes("workable.com")) boardLabel = "🔴 Workable";
+      else if (job.url.includes("smartrecruiters.com")) boardLabel = "🔴 SmartRecruiters";
+      else if (job.url.includes("workatastartup.com")) boardLabel = "🔴 YC Startup";
+      else if (job.url.includes("rippling.com")) boardLabel = "🔴 Rippling";
+      else if (job.url.includes("recruitee.com")) boardLabel = "🔴 Recruitee";
+      else if (job.url.includes("gusto.com")) boardLabel = "🔴 Gusto";
+      else boardLabel = "🔴 ATS Direct";
+    } else if (job.url.includes("linkedin.com")) {
       boardClass = "linkedin";
       boardLabel = "LinkedIn";
     } else if (job.url.includes("lever.co")) {
