@@ -2568,7 +2568,6 @@
     #module-job-scanner .js-tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
     #module-job-scanner .js-tag-greenhouse { background: #16423c; color: #4ade80; }
     #module-job-scanner .js-tag-ashbyhq { background: #1e2a4a; color: #60a5fa; }
-    #module-job-scanner .js-tag-linkedin { background: #1e3a5f; color: #38bdf8; }
     #module-job-scanner .js-tag-internshala { background: #3b1f00; color: #fb923c; }
     #module-job-scanner .js-log-line { font-family: var(--font-mono); font-size: 12px; line-height: 1.6; padding: 2px 0; }
     #module-job-scanner .js-log-ok { color: #4ade80; }
@@ -2821,7 +2820,7 @@
 *   **Custom Role Search**: Provides text-input flex, automatically defaulting to the profile's main target role to prevent empty search executions.
 
 ## 7. SYSTEM RESILIENCY RULES
-*   **API Resilience**: Legacy model deprecation safety. Always query `gemini-3.0-flash` first, and gracefully fallback to `gemini-3.5-flash` in the event of a 404 response.
+*   **API Resilience**: Model deprecation safety. Always query `gemini-2.0-flash` first, gracefully falling back to `gemini-1.5-flash` on 404.
 *   **Environmental Key Sourcing**: Attempt local `.env` key extraction automatically on load. If variables (`TAVILY_API_KEY`, `GEMINI_API_KEY`) are missing, display a persistent Warning Alert Banner prompting direct provider linkage config.
 *   **Dropdown SVG Focus Fix**: Prevent SVG focus duplicate chevrons on styled custom selects by declaring `!important` resets on `.status-select option` backgrounds.
 *   **Portable Bookmarks**: Bookmarklet code must dynamically read `window.location.href` to remain functional across folders, local servers, or desktop relocations without hardcoding absolute paths.
@@ -3258,7 +3257,6 @@ async function restoreFromBackup() {
       const val = await idbGet(key);
       if (val != null) {
         _lsSet(key, val); // write directly, skip the mirroring proxy
-        console.log(`[backup] Restored ${key} from IndexedDB`);
       }
     }
   }
@@ -3397,7 +3395,7 @@ async function loadEnvKeys() {
       }
     }
   } catch (e) {
-    console.log("Could not load local .env file. Using manual settings.", e);
+    // .env not present — silently fall through to manual settings
   }
   
   // Verify if keys are configured
@@ -4404,8 +4402,7 @@ Rules:
 5. Provide a Subject Line at the top in the format "Subject: [compelling subject line]" if the user selected Cold Email, otherwise completely omit it and start directly.`;
 
   try {
-    // Try Gemini 3.0 Flash (standard 3.x model)
-    let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key=${geminiApiKey}`, {
+    let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -4423,10 +4420,8 @@ Rules:
       })
     });
 
-    // Fallback defensively to Gemini 3.5 Flash if 3.0 Flash is not accessible
     if (!response.ok && response.status === 404) {
-      console.warn("Gemini 3.0 Flash returned 404, falling back to Gemini 3.5 Flash...");
-      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${geminiApiKey}`, {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -4572,7 +4567,7 @@ function renderTracker() {
 
     const urlCell = app.url
       ? `<div class="url-cell">
-           <a class="url-link" href="${app.url}" target="_blank" title="${app.url}">Apply ↗</a>
+           <a class="url-link" href="${jsEscHtml(app.url)}" target="_blank" title="${jsEscHtml(app.url)}">Apply ↗</a>
            <button class="url-edit-btn" onclick="editRowUrl(${idx})" title="Edit URL">
              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
            </button>
@@ -4583,10 +4578,10 @@ function renderTracker() {
          </button>`;
 
     tr.innerHTML = `
-      <td><span class="tracker-company">${app.company}</span></td>
-      <td><span class="tracker-role">${app.role}</span></td>
-      <td>${app.date || '-'}</td>
-      <td>${app.location || '-'}</td>
+      <td><span class="tracker-company">${jsEscHtml(app.company)}</span></td>
+      <td><span class="tracker-role">${jsEscHtml(app.role)}</span></td>
+      <td>${jsEscHtml(app.date || '-')}</td>
+      <td>${jsEscHtml(app.location || '-')}</td>
       <td>
         <select class="status-select ${selectClass}" onchange="updateRowStatus(${idx}, this.value)">
           <option value="To Apply" ${app.status === 'To Apply' ? 'selected' : ''}>To Apply</option>
@@ -4803,6 +4798,11 @@ function toggleSearchMode(mode) {
 
 // Crawl Active Entry-Level Job Postings in last 48 hours using Tavily
 async function searchJobs() {
+  if (!tavilyApiKey) {
+    showToast("Tavily API key is not set. Please configure it in Settings ↗");
+    openSettings();
+    return;
+  }
   octoOnSearch();
   const searchMode = document.getElementById("search-role-select").value;
   let roleQuery = "";
