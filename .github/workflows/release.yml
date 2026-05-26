@@ -18,15 +18,19 @@ jobs:
           - platform: macos-latest
             args: --target aarch64-apple-darwin
             artifact_suffix: macOS-arm64
+            rust_target: aarch64-apple-darwin
           - platform: macos-latest
             args: --target x86_64-apple-darwin
             artifact_suffix: macOS-x64
+            rust_target: x86_64-apple-darwin
           - platform: ubuntu-22.04
             args: ''
             artifact_suffix: Linux-x64
+            rust_target: x86_64-unknown-linux-gnu
           - platform: windows-latest
             args: ''
             artifact_suffix: Windows-x64
+            rust_target: x86_64-pc-windows-msvc
 
     runs-on: ${{ matrix.platform }}
 
@@ -36,7 +40,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ contains(matrix.args, 'aarch64-apple-darwin') && 'aarch64-apple-darwin' || contains(matrix.args, 'x86_64-apple-darwin') && 'x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.rust_target }}
 
       - name: Linux system deps
         if: matrix.platform == 'ubuntu-22.04'
@@ -53,8 +57,7 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
-      - name: Build and publish (creates/updates the release + latest.json)
-        id: tauri
+      - name: Build and publish
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -66,87 +69,83 @@ jobs:
           releaseBody: |
             ## CareerOS ${{ github.ref_name }}
 
-            ### Install
             | Platform | File | Notes |
             |---|---|---|
             | Windows | `CareerOS-*-Windows-x64.exe` | **Recommended — supports auto-update** |
             | Windows | `CareerOS-*-Windows-x64.msi` | Manual install only, no auto-update |
-            | macOS (Apple Silicon) | `CareerOS-*-macOS-arm64.dmg` | |
-            | macOS (Intel) | `CareerOS-*-macOS-x64.dmg` | |
+            | macOS Apple Silicon | `CareerOS-*-macOS-arm64.dmg` | |
+            | macOS Intel | `CareerOS-*-macOS-x64.dmg` | |
             | Linux | `CareerOS-*-Linux-x64.AppImage` | |
             | Linux | `CareerOS-*-Linux-x64.deb` | |
             | Android | `CareerOS-*-Android.apk` | |
-
-            > **MSI users:** The MSI installer does not support auto-update. Please use the `.exe` installer for automatic updates.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
 
-      # ── Rename artifacts to human-friendly names ──────────────────────────
+      # ── Rename artifacts to friendly names and re-upload ──────────────────
+
       - name: Rename Windows artifacts
         if: matrix.platform == 'windows-latest'
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
         run: |
-          $ver = "${{ github.ref_name }}".TrimStart('v')
+          $ver = $env:TAG.TrimStart('v')
           $src = "src-tauri/target/release/bundle"
 
-          # NSIS installer (auto-update capable) — rename and re-upload
-          $nsis = Get-ChildItem "$src/nsis" -Filter "*.exe" | Select-Object -First 1
+          $nsis = Get-ChildItem "$src/nsis" -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($nsis) {
             $dest = "CareerOS-$ver-Windows-x64.exe"
             Copy-Item $nsis.FullName $dest
-            gh release upload ${{ github.ref_name }} $dest --clobber
+            gh release upload $env:TAG $dest --clobber
           }
 
-          # MSI (manual install only)
-          $msi = Get-ChildItem "$src/msi" -Filter "*.msi" | Select-Object -First 1
+          $msi = Get-ChildItem "$src/msi" -Filter "*.msi" -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($msi) {
             $dest = "CareerOS-$ver-Windows-x64.msi"
             Copy-Item $msi.FullName $dest
-            gh release upload ${{ github.ref_name }} $dest --clobber
+            gh release upload $env:TAG $dest --clobber
           }
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Rename macOS artifacts
         if: matrix.platform == 'macos-latest'
-        run: |
-          ver="${{ github.ref_name }}"
-          ver="${ver#v}"
-          suffix="${{ matrix.artifact_suffix }}"
-          src="src-tauri/target/${{ contains(matrix.args, 'aarch64') && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}/release/bundle/dmg"
-
-          dmg=$(find "$src" -name "*.dmg" | head -1)
-          if [ -n "$dmg" ]; then
-            dest="CareerOS-${ver}-${suffix}.dmg"
-            cp "$dmg" "$dest"
-            gh release upload ${{ github.ref_name }} "$dest" --clobber
-          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          SUFFIX: ${{ matrix.artifact_suffix }}
+          RUST_TARGET: ${{ matrix.rust_target }}
+        run: |
+          ver="${TAG#v}"
+          dmg=$(find "src-tauri/target/${RUST_TARGET}/release/bundle/dmg" -name "*.dmg" 2>/dev/null | head -1)
+          if [ -n "$dmg" ]; then
+            dest="CareerOS-${ver}-${SUFFIX}.dmg"
+            cp "$dmg" "$dest"
+            gh release upload "$TAG" "$dest" --clobber
+          fi
 
       - name: Rename Linux artifacts
         if: matrix.platform == 'ubuntu-22.04'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
         run: |
-          ver="${{ github.ref_name }}"
-          ver="${ver#v}"
+          ver="${TAG#v}"
           src="src-tauri/target/release/bundle"
 
-          appimage=$(find "$src/appimage" -name "*.AppImage" | head -1)
+          appimage=$(find "$src/appimage" -name "*.AppImage" 2>/dev/null | head -1)
           if [ -n "$appimage" ]; then
             dest="CareerOS-${ver}-Linux-x64.AppImage"
             cp "$appimage" "$dest"
-            gh release upload ${{ github.ref_name }} "$dest" --clobber
+            gh release upload "$TAG" "$dest" --clobber
           fi
 
-          deb=$(find "$src/deb" -name "*.deb" | head -1)
+          deb=$(find "$src/deb" -name "*.deb" 2>/dev/null | head -1)
           if [ -n "$deb" ]; then
             dest="CareerOS-${ver}-Linux-x64.deb"
             cp "$deb" "$dest"
-            gh release upload ${{ github.ref_name }} "$dest" --clobber
+            gh release upload "$TAG" "$dest" --clobber
           fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ── Android ────────────────────────────────────────────────────────────────
   release-android:
@@ -201,17 +200,17 @@ jobs:
           cargo tauri android build --apk
 
       - name: Upload renamed APK
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
         run: |
-          ver="${{ github.ref_name }}"
-          ver="${ver#v}"
-          apk=$(find src-tauri/gen/android/app/build/outputs/apk/universal/release -name "*.apk" | head -1)
+          ver="${TAG#v}"
+          apk=$(find src-tauri/gen/android/app/build/outputs/apk/universal/release -name "*.apk" 2>/dev/null | head -1)
           if [ -n "$apk" ]; then
             dest="CareerOS-${ver}-Android.apk"
             cp "$apk" "$dest"
-            gh release upload ${{ github.ref_name }} "$dest" --clobber
+            gh release upload "$TAG" "$dest" --clobber
           fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ── iOS ────────────────────────────────────────────────────────────────────
   release-ios:
@@ -255,14 +254,14 @@ jobs:
         run: cargo tauri ios build --export-method app-store-connect 2>/dev/null || cargo tauri ios build
 
       - name: Upload renamed IPA
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
         run: |
-          ver="${{ github.ref_name }}"
-          ver="${ver#v}"
-          ipa=$(find src-tauri/gen/apple/build/arm64 -name "*.ipa" | head -1)
+          ver="${TAG#v}"
+          ipa=$(find src-tauri/gen/apple/build/arm64 -name "*.ipa" 2>/dev/null | head -1)
           if [ -n "$ipa" ]; then
             dest="CareerOS-${ver}-iOS.ipa"
             cp "$ipa" "$dest"
-            gh release upload ${{ github.ref_name }} "$dest" --clobber
+            gh release upload "$TAG" "$dest" --clobber
           fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
