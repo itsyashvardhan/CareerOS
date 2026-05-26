@@ -3203,8 +3203,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   selectRole("llmops"); // default selected
   
   // Sync inputs to settings modal fields
-  // Tavily key is hardcoded — not user-configurable
   document.getElementById("settings-gemini").value = geminiApiKey;
+  document.getElementById("settings-tavily").value = tavilyApiKey;
 
   // Render initial application tracker data and metrics
   renderTracker();
@@ -3268,7 +3268,13 @@ async function loadEnvKeys() {
         localStorage.setItem("gemini_key", foundGemini);
         document.getElementById("settings-gemini").value = foundGemini;
       }
-      
+
+      if (foundTavily && !localStorage.getItem("tavily_key")) {
+        tavilyApiKey = foundTavily;
+        localStorage.setItem("tavily_key", foundTavily);
+        document.getElementById("settings-tavily").value = foundTavily;
+      }
+
       if (foundTavily || foundGemini) {
         showToast("Successfully loaded API keys from local .env!");
       }
