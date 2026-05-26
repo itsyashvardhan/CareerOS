@@ -3166,6 +3166,67 @@ const countryData = {
   indonesia: { name: "Indonesia", adjective: "Indonesian", flag: "🇮🇩" }
 };
 
+// ── Persistent Backup Store (IndexedDB) ───────────────────────────────────────
+// Mirrors every localStorage write so data survives app updates, WebView resets,
+// and accidental localStorage clears. On first load, restores missing keys.
+const DB_NAME = "careeros_backup";
+const DB_STORE = "kv";
+const DB_VERSION = 1;
+
+function _idb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => e.target.result.createObjectStore(DB_STORE);
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+async function idbSet(key, value) {
+  try {
+    const db = await _idb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(DB_STORE, "readwrite");
+      tx.objectStore(DB_STORE).put(value, key);
+      tx.oncomplete = resolve;
+      tx.onerror = e => reject(e.target.error);
+    });
+  } catch (e) { console.warn("idbSet failed", e); }
+}
+
+async function idbGet(key) {
+  try {
+    const db = await _idb();
+    return new Promise((resolve, reject) => {
+      const req = db.transaction(DB_STORE, "readonly").objectStore(DB_STORE).get(key);
+      req.onsuccess = e => resolve(e.target.result ?? null);
+      req.onerror = e => reject(e.target.error);
+    });
+  } catch (e) { console.warn("idbGet failed", e); return null; }
+}
+
+// Wrap localStorage.setItem to mirror every write to IndexedDB automatically
+const _lsSet = localStorage.setItem.bind(localStorage);
+localStorage.setItem = function(key, value) {
+  _lsSet(key, value);
+  idbSet(key, value);
+};
+
+// Restore missing localStorage keys from IndexedDB backup on startup
+async function restoreFromBackup() {
+  const keys = ["tavily_key", "gemini_key", "applications_tracker", "bookmarked_contacts"];
+  for (const key of keys) {
+    if (!localStorage.getItem(key)) {
+      const val = await idbGet(key);
+      if (val != null) {
+        _lsSet(key, val); // write directly, skip the mirroring proxy
+        console.log(`[backup] Restored ${key} from IndexedDB`);
+      }
+    }
+  }
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 // Global Credentials Keys — stored in localStorage, never hardcoded
 let tavilyApiKey = localStorage.getItem("tavily_key") || "";
 let geminiApiKey = localStorage.getItem("gemini_key") || "";
@@ -3198,6 +3259,16 @@ let bookmarkedContacts = JSON.parse(localStorage.getItem("bookmarked_contacts"))
 
 // Initialization
 document.addEventListener("DOMContentLoaded", async () => {
+  // Restore any localStorage keys wiped by an update or WebView reset
+  await restoreFromBackup();
+  // Re-read keys that may have just been restored
+  tavilyApiKey = localStorage.getItem("tavily_key") || tavilyApiKey;
+  geminiApiKey = localStorage.getItem("gemini_key") || geminiApiKey;
+  const restoredTracker = localStorage.getItem("applications_tracker");
+  if (restoredTracker) trackerData = JSON.parse(restoredTracker);
+  const restoredContacts = localStorage.getItem("bookmarked_contacts");
+  if (restoredContacts) bookmarkedContacts = JSON.parse(restoredContacts);
+
   renderRoles();
   renderRoleDropdown();
   renderStageChips();
