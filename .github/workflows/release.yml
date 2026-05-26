@@ -5,7 +5,9 @@ on:
     branches: [main]
 
 jobs:
-  release:
+
+  # ── Desktop: Windows, macOS (ARM + Intel), Linux ───────────────────────────
+  release-desktop:
     permissions:
       contents: write
     strategy:
@@ -29,9 +31,9 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ contains(matrix.args, 'aarch64') && 'aarch64-apple-darwin' || contains(matrix.args, 'x86_64-apple-darwin') && 'x86_64-apple-darwin' || '' }}
+          targets: ${{ contains(matrix.args, 'aarch64-apple-darwin') && 'aarch64-apple-darwin' || contains(matrix.args, 'x86_64-apple-darwin') && 'x86_64-apple-darwin' || '' }}
 
-      - name: Install Linux system deps
+      - name: Linux system deps
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
@@ -46,7 +48,7 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
-      - name: Build and publish release
+      - name: Build and publish
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -55,7 +57,126 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: CareerOS v__VERSION__
-          releaseBody: See the assets below to download this version of CareerOS.
+          releaseBody: See assets below to install CareerOS on your platform.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+  # ── Android ────────────────────────────────────────────────────────────────
+  release-android:
+    permissions:
+      contents: write
+    runs-on: ubuntu-22.04
+    needs: release-desktop   # attach to the same release after desktop creates it
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust + Android targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK + NDK
+        uses: android-actions/setup-android@v3
+
+      - run: sdkmanager "ndk;27.0.12077973"
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Build Android APK
+        env:
+          NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+          # Keystore secrets — add these in repo Settings → Secrets
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > /tmp/careeros.keystore
+            export TAURI_ANDROID_KEYSTORE=/tmp/careeros.keystore
+            export TAURI_ANDROID_KEYSTORE_PASSWORD="$STORE_PASSWORD"
+            export TAURI_ANDROID_KEY_ALIAS="$KEY_ALIAS"
+            export TAURI_ANDROID_KEY_PASSWORD="$KEY_PASSWORD"
+          fi
+          cargo tauri android build --apk
+
+      - name: Read version
+        id: ver
+        run: echo "version=$(cargo metadata --manifest-path src-tauri/Cargo.toml --no-deps --format-version 1 | python3 -c \"import sys,json; print(json.load(sys.stdin)['packages'][0]['version'])\")" >> $GITHUB_OUTPUT
+
+      - name: Upload APK to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          files: src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── iOS ────────────────────────────────────────────────────────────────────
+  release-ios:
+    permissions:
+      contents: write
+    runs-on: macos-latest
+    needs: release-desktop
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust + iOS targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Import Apple certificate
+        # Skip if no signing secrets are configured; produces unsigned IPA
+        if: ${{ secrets.APPLE_CERTIFICATE != '' }}
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          KEYCHAIN_PASSWORD: ci-keychain-pass
+        run: |
+          echo "$APPLE_CERTIFICATE" | base64 --decode > /tmp/cert.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import /tmp/cert.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+      - name: Build iOS IPA
+        run: cargo tauri ios build --export-method app-store-connect 2>/dev/null || cargo tauri ios build
+
+      - name: Read version
+        id: ver
+        run: echo "version=$(cargo metadata --manifest-path src-tauri/Cargo.toml --no-deps --format-version 1 | python3 -c \"import sys,json; print(json.load(sys.stdin)['packages'][0]['version'])\")" >> $GITHUB_OUTPUT
+
+      - name: Upload IPA to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          files: src-tauri/gen/apple/build/arm64/*.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
