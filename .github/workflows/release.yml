@@ -17,12 +17,16 @@ jobs:
         include:
           - platform: macos-latest
             args: --target aarch64-apple-darwin
+            artifact_suffix: macOS-arm64
           - platform: macos-latest
             args: --target x86_64-apple-darwin
+            artifact_suffix: macOS-x64
           - platform: ubuntu-22.04
             args: ''
+            artifact_suffix: Linux-x64
           - platform: windows-latest
             args: ''
+            artifact_suffix: Windows-x64
 
     runs-on: ${{ matrix.platform }}
 
@@ -49,26 +53,107 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
-      - name: Build and publish
+      - name: Build and publish (creates/updates the release + latest.json)
+        id: tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: v__VERSION__
-          releaseName: CareerOS v__VERSION__
-          releaseBody: See assets below to install CareerOS on your platform.
+          tagName: ${{ github.ref_name }}
+          releaseName: CareerOS ${{ github.ref_name }}
+          releaseBody: |
+            ## CareerOS ${{ github.ref_name }}
+
+            ### Install
+            | Platform | File | Notes |
+            |---|---|---|
+            | Windows | `CareerOS-*-Windows-x64.exe` | **Recommended — supports auto-update** |
+            | Windows | `CareerOS-*-Windows-x64.msi` | Manual install only, no auto-update |
+            | macOS (Apple Silicon) | `CareerOS-*-macOS-arm64.dmg` | |
+            | macOS (Intel) | `CareerOS-*-macOS-x64.dmg` | |
+            | Linux | `CareerOS-*-Linux-x64.AppImage` | |
+            | Linux | `CareerOS-*-Linux-x64.deb` | |
+            | Android | `CareerOS-*-Android.apk` | |
+
+            > **MSI users:** The MSI installer does not support auto-update. Please use the `.exe` installer for automatic updates.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      # ── Rename artifacts to human-friendly names ──────────────────────────
+      - name: Rename Windows artifacts
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}".TrimStart('v')
+          $src = "src-tauri/target/release/bundle"
+
+          # NSIS installer (auto-update capable) — rename and re-upload
+          $nsis = Get-ChildItem "$src/nsis" -Filter "*.exe" | Select-Object -First 1
+          if ($nsis) {
+            $dest = "CareerOS-$ver-Windows-x64.exe"
+            Copy-Item $nsis.FullName $dest
+            gh release upload ${{ github.ref_name }} $dest --clobber
+          }
+
+          # MSI (manual install only)
+          $msi = Get-ChildItem "$src/msi" -Filter "*.msi" | Select-Object -First 1
+          if ($msi) {
+            $dest = "CareerOS-$ver-Windows-x64.msi"
+            Copy-Item $msi.FullName $dest
+            gh release upload ${{ github.ref_name }} $dest --clobber
+          }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Rename macOS artifacts
+        if: matrix.platform == 'macos-latest'
+        run: |
+          ver="${{ github.ref_name }}"
+          ver="${ver#v}"
+          suffix="${{ matrix.artifact_suffix }}"
+          src="src-tauri/target/${{ contains(matrix.args, 'aarch64') && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}/release/bundle/dmg"
+
+          dmg=$(find "$src" -name "*.dmg" | head -1)
+          if [ -n "$dmg" ]; then
+            dest="CareerOS-${ver}-${suffix}.dmg"
+            cp "$dmg" "$dest"
+            gh release upload ${{ github.ref_name }} "$dest" --clobber
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Rename Linux artifacts
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          ver="${{ github.ref_name }}"
+          ver="${ver#v}"
+          src="src-tauri/target/release/bundle"
+
+          appimage=$(find "$src/appimage" -name "*.AppImage" | head -1)
+          if [ -n "$appimage" ]; then
+            dest="CareerOS-${ver}-Linux-x64.AppImage"
+            cp "$appimage" "$dest"
+            gh release upload ${{ github.ref_name }} "$dest" --clobber
+          fi
+
+          deb=$(find "$src/deb" -name "*.deb" | head -1)
+          if [ -n "$deb" ]; then
+            dest="CareerOS-${ver}-Linux-x64.deb"
+            cp "$deb" "$dest"
+            gh release upload ${{ github.ref_name }} "$dest" --clobber
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ── Android ────────────────────────────────────────────────────────────────
   release-android:
     permissions:
       contents: write
     runs-on: ubuntu-22.04
-    needs: release-desktop   # attach to the same release after desktop creates it
+    needs: release-desktop
 
     steps:
       - uses: actions/checkout@v4
@@ -101,7 +186,6 @@ jobs:
         env:
           NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
           ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
-          # Keystore secrets — add these in repo Settings → Secrets
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -116,15 +200,16 @@ jobs:
           fi
           cargo tauri android build --apk
 
-      - name: Read version
-        id: ver
-        run: echo "version=$(cargo metadata --manifest-path src-tauri/Cargo.toml --no-deps --format-version 1 | python3 -c \"import sys,json; print(json.load(sys.stdin)['packages'][0]['version'])\")" >> $GITHUB_OUTPUT
-
-      - name: Upload APK to release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.ver.outputs.version }}
-          files: src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk
+      - name: Upload renamed APK
+        run: |
+          ver="${{ github.ref_name }}"
+          ver="${ver#v}"
+          apk=$(find src-tauri/gen/android/app/build/outputs/apk/universal/release -name "*.apk" | head -1)
+          if [ -n "$apk" ]; then
+            dest="CareerOS-${ver}-Android.apk"
+            cp "$apk" "$dest"
+            gh release upload ${{ github.ref_name }} "$dest" --clobber
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -152,7 +237,6 @@ jobs:
         run: cargo install tauri-cli --version "^2" --locked
 
       - name: Import Apple certificate
-        # Skip if no signing secrets are configured; produces unsigned IPA
         if: ${{ secrets.APPLE_CERTIFICATE != '' }}
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -170,14 +254,15 @@ jobs:
       - name: Build iOS IPA
         run: cargo tauri ios build --export-method app-store-connect 2>/dev/null || cargo tauri ios build
 
-      - name: Read version
-        id: ver
-        run: echo "version=$(cargo metadata --manifest-path src-tauri/Cargo.toml --no-deps --format-version 1 | python3 -c \"import sys,json; print(json.load(sys.stdin)['packages'][0]['version'])\")" >> $GITHUB_OUTPUT
-
-      - name: Upload IPA to release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.ver.outputs.version }}
-          files: src-tauri/gen/apple/build/arm64/*.ipa
+      - name: Upload renamed IPA
+        run: |
+          ver="${{ github.ref_name }}"
+          ver="${ver#v}"
+          ipa=$(find src-tauri/gen/apple/build/arm64 -name "*.ipa" | head -1)
+          if [ -n "$ipa" ]; then
+            dest="CareerOS-${ver}-iOS.ipa"
+            cp "$ipa" "$dest"
+            gh release upload ${{ github.ref_name }} "$dest" --clobber
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
