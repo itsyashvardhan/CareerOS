@@ -2590,16 +2590,43 @@
   </style>
 
   <!-- Header row -->
-  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; flex-wrap:wrap; gap:10px;">
-    <div>
-      <h2 style="font-size:1.3rem; font-weight:700; color:var(--color-text-primary); margin:0;">Job Scanner</h2>
-      <p style="font-size:0.8rem; color:var(--color-text-muted); margin-top:2px;">Fresher / 0–2 yr · India · UAE · Singapore · Remote AI · Live API scrape</p>
-    </div>
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem; flex-wrap:wrap; gap:10px;">
+    <h2 style="font-size:1.3rem; font-weight:700; color:var(--color-text-primary); margin:0;">Job Scanner</h2>
     <div style="display:flex; gap:8px; align-items:center;">
       <button id="js-btnExportCSV" class="js-btn js-btn-ghost" style="display:none" onclick="jsScannerExportCSV()">Export CSV</button>
       <button id="js-btnExportJSON" class="js-btn js-btn-ghost" style="display:none" onclick="jsScannerExportJSON()">Export JSON</button>
       <button id="js-btnScan" class="js-btn js-btn-primary" onclick="jsScannerRun()">Run Scan</button>
     </div>
+  </div>
+
+  <!-- Active filter chips row -->
+  <div id="js-filterChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:1rem;">
+    <!-- Experience chips -->
+    <button class="js-chip active" id="js-chip-fresher" onclick="jsToggleExpChip('fresher', this)" title="0 yrs experience only">
+      <span class="js-dot"></span> Fresher
+    </button>
+    <button class="js-chip active" id="js-chip-junior" onclick="jsToggleExpChip('junior', this)" title="0–2 yrs experience">
+      <span class="js-dot"></span> 0–2 yr
+    </button>
+    <div style="width:1px; background:rgba(255,255,255,0.08); margin:0 2px;"></div>
+    <!-- Geo chips -->
+    <button class="js-chip active" id="js-chip-india" onclick="jsToggleGeoChip('india', this)">
+      <span class="js-dot"></span> 🇮🇳 India
+    </button>
+    <button class="js-chip active" id="js-chip-uae" onclick="jsToggleGeoChip('uae', this)">
+      <span class="js-dot"></span> 🇦🇪 UAE
+    </button>
+    <button class="js-chip active" id="js-chip-singapore" onclick="jsToggleGeoChip('singapore', this)">
+      <span class="js-dot"></span> 🇸🇬 Singapore
+    </button>
+    <button class="js-chip active" id="js-chip-remote" onclick="jsToggleGeoChip('remote', this)">
+      <span class="js-dot"></span> 🌐 Remote AI
+    </button>
+    <div style="width:1px; background:rgba(255,255,255,0.08); margin:0 2px;"></div>
+    <!-- Source chip -->
+    <button class="js-chip active" id="js-chip-liveapi" onclick="jsToggleLiveApi(this)" title="Pull fresh from ATS APIs (not cache)">
+      <span class="js-dot"></span> ⚡ Live API
+    </button>
   </div>
 
   <!-- Stats row -->
@@ -2665,9 +2692,6 @@
           <option value="title">Sort: Title</option>
           <option value="company">Sort: Company</option>
         </select>
-        <label style="display:flex; align-items:center; gap:6px; font-size:0.83rem; color:var(--color-text-muted); cursor:pointer;">
-          <input type="checkbox" id="js-indiaOnly" style="accent-color:var(--accent-indigo);" onchange="jsScannerRender()"> India only
-        </label>
       </div>
 
       <!-- Results -->
@@ -5313,9 +5337,24 @@ let jsActiveSourceFilters = new Set();
 
 function jsSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// Base geo terms per region — extended by active filter chips at runtime
+const JS_GEO_MAP = {
+  india:     ["india","bangalore","bengaluru","mumbai","delhi","hyderabad","pune","chennai","noida","gurgaon"],
+  uae:       ["uae","dubai","abu dhabi","sharjah","united arab emirates"],
+  singapore: ["singapore"],
+  remote:    ["remote","anywhere","worldwide"],
+};
+// Active geo regions — toggled by filter chips; all on by default
+let jsActiveGeos = new Set(["india","uae","singapore","remote"]);
+// Active experience filter: "fresher" = strict 0 yr, "junior" = up to 2 yr, "any"
+let jsExpFilter = "junior"; // default: 0–2 yr
+// Source mode chip state
+let jsLiveApiOnly = true;
+
 const JS_TARGET_GEOS = [
   "india","bangalore","bengaluru","mumbai","delhi","hyderabad","pune","chennai","noida","gurgaon",
   "singapore",
+  "uae","dubai","abu dhabi","sharjah","united arab emirates",
   "malaysia","kuala lumpur","kl","penang",
   "indonesia","jakarta","bandung",
   "remote",
@@ -5336,9 +5375,15 @@ function jsPassesFilter(title) {
 }
 
 function jsPassesGeo(location) {
-  if (!location) return false; // no location = can't confirm target geo, exclude
+  if (!location) return false;
   const l = location.toLowerCase();
-  return JS_TARGET_GEOS.some(g => l.includes(g));
+  // Build active term list from toggled geo chips
+  const activeTerms = [];
+  for (const region of jsActiveGeos) {
+    if (JS_GEO_MAP[region]) activeTerms.push(...JS_GEO_MAP[region]);
+  }
+  if (activeTerms.length === 0) return true; // no filter = show all
+  return activeTerms.some(g => l.includes(g));
 }
 
 function jsPassesRecency(posted_at) {
@@ -5351,7 +5396,19 @@ function jsPassesRecency(posted_at) {
 
 function jsPassesExperience(title) {
   const t = title.toLowerCase();
-  return !JS_EXP_NEGATIVE.some(e => t.includes(e.toLowerCase()));
+  if (jsExpFilter === "any") return true;
+  // Always exclude senior/lead/manager regardless of mode
+  const seniorTerms = ["senior","lead","principal","staff","manager","director","vp","head of"];
+  if (seniorTerms.some(e => t.includes(e))) return false;
+  if (jsExpFilter === "fresher") {
+    // Strict: must have a fresher/0yr signal, reject 1+ yr requirements
+    const strictNeg = ["1+ year","2+ year","3+ year","1 year","2 year","minimum 1","at least 1","at least 2"];
+    if (strictNeg.some(e => t.includes(e))) return false;
+  } else {
+    // junior (0–2 yr): reject 2+ yr and above
+    if (JS_EXP_NEGATIVE.some(e => t.includes(e.toLowerCase()))) return false;
+  }
+  return true;
 }
 
 function jsLog(msg, type = "info") {
@@ -5367,6 +5424,40 @@ function jsLog(msg, type = "info") {
 function jsScannerClearLog() {
   const lb = document.getElementById("js-logBox");
   if (lb) { lb.innerHTML = ''; jsLog("Log cleared.", "info"); }
+}
+
+// ── Filter chip toggles ──
+function jsToggleGeoChip(region, btn) {
+  if (jsActiveGeos.has(region)) {
+    jsActiveGeos.delete(region);
+    btn.classList.remove("active");
+  } else {
+    jsActiveGeos.add(region);
+    btn.classList.add("active");
+  }
+  jsScannerRender();
+}
+
+function jsToggleExpChip(mode, btn) {
+  // Fresher and 0–2yr are mutually exclusive
+  if (mode === "fresher") {
+    jsExpFilter = (jsExpFilter === "fresher") ? "any" : "fresher";
+    document.getElementById("js-chip-fresher").classList.toggle("active", jsExpFilter === "fresher");
+    document.getElementById("js-chip-junior").classList.toggle("active", jsExpFilter !== "fresher");
+  } else {
+    jsExpFilter = (jsExpFilter === "junior") ? "any" : "junior";
+    document.getElementById("js-chip-junior").classList.toggle("active", jsExpFilter === "junior");
+    document.getElementById("js-chip-fresher").classList.toggle("active", false);
+  }
+  jsScannerRender();
+}
+
+function jsToggleLiveApi(btn) {
+  jsLiveApiOnly = !jsLiveApiOnly;
+  btn.classList.toggle("active", jsLiveApiOnly);
+  // Live API mode: re-run scan; cached mode: just re-render existing results
+  if (jsLiveApiOnly && jsAllJobs.length === 0) jsScannerRun();
+  else jsScannerRender();
 }
 
 function jsSetProgress(done, total) {
@@ -5590,15 +5681,11 @@ function jsEscHtml(s) {
 function jsScannerRender() {
   const query = (document.getElementById("js-searchBox")?.value || "").toLowerCase();
   const sort = document.getElementById("js-sortSelect")?.value || "source";
-  const indiaOnly = document.getElementById("js-indiaOnly")?.checked || false;
 
   let jobs = jsAllJobs.filter(j => {
     if (!jsActiveSourceFilters.has(j.source)) return false;
-    if (indiaOnly) {
-      const loc = j.location.toLowerCase();
-      const indiaTerms = ["india","bangalore","bengaluru","mumbai","delhi","hyderabad","pune","remote"];
-      if (!indiaTerms.some(t => loc.includes(t)) && j.location !== "") return false;
-    }
+    if (!jsPassesGeo(j.location)) return false;
+    if (!jsPassesExperience(j.title)) return false;
     if (query && !j.title.toLowerCase().includes(query) && !j.company.toLowerCase().includes(query) && !j.location.toLowerCase().includes(query)) return false;
     return true;
   });
