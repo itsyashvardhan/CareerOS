@@ -4937,31 +4937,23 @@ async function searchJobs() {
                       urlLower.includes("facebook.com") || 
                       urlLower.includes("reddit.com");
 
-      // Enforce entry level indicators
-      const isEntry = titleLower.includes("new grad") || 
-                      titleLower.includes("fresher") || 
-                      titleLower.includes("junior") || 
-                      titleLower.includes("entry level") || 
-                      titleLower.includes("intern") || 
-                      titleLower.includes("student") || 
-                      titleLower.includes("associate") || 
-                      titleLower.includes("0-1") || 
-                      titleLower.includes("0 years") ||
-                      contentLower.includes("0-1 years") ||
-                      contentLower.includes("0 years") ||
-                      contentLower.includes("new grad") ||
-                      contentLower.includes("fresher");
-
-      // Strictly discard senior titles
-      const isSenior = titleLower.includes("senior") || 
-                       titleLower.includes("sr.") || 
-                       titleLower.includes("principal") || 
+      // Discard senior / experienced-only titles
+      const isSenior = titleLower.includes("senior") ||
+                       titleLower.includes("sr.") ||
+                       titleLower.includes("principal") ||
+                       titleLower.includes("staff ") ||
                        titleLower.includes("lead") ||
                        titleLower.includes("manager") ||
                        titleLower.includes("director") ||
-                       titleLower.includes("vp");
+                       titleLower.includes("vp") ||
+                       contentLower.includes("5+ years") ||
+                       contentLower.includes("7+ years") ||
+                       contentLower.includes("10+ years") ||
+                       contentLower.includes("minimum 3 year") ||
+                       contentLower.includes("minimum 4 year") ||
+                       contentLower.includes("minimum 5 year");
 
-      if (isEntry && !isSenior && !isSpam) {
+      if (!isSenior && !isSpam) {
         filteredJobs.push(result);
       }
     });
