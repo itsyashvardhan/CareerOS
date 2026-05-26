@@ -173,18 +173,16 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          echo "$TAURI_SIGNING_PRIVATE_KEY" > /tmp/tauri.key
           cd dist
           for f in *.nsis.zip *.app.tar.gz *.AppImage.tar.gz; do
             [ -f "$f" ] || continue
             [ -f "${f}.sig" ] && { echo "  already signed: $f"; continue; }
             echo "  signing: $f"
             cargo tauri signer sign \
-              --private-key-path /tmp/tauri.key \
+              --private-key "$TAURI_SIGNING_PRIVATE_KEY" \
               --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
               "$f"
           done
-          rm -f /tmp/tauri.key
 
       - name: Upload any new .sig files
         run: |
