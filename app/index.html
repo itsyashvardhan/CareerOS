@@ -19,10 +19,11 @@
   <link rel="icon" id="pwa-favicon" type="image/svg+xml" href="">
   <link rel="manifest" id="pwa-manifest" href="">
   
-  <!-- Premium Fonts -->
+  <!-- Fonts: load async so they never block first paint -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
 
   <style>
     :root {
@@ -3284,57 +3285,56 @@ let generatedMail = "";
 const activeStages = new Set(stagesData.map(s => s.num));
 let bookmarkedContacts = JSON.parse(localStorage.getItem("bookmarked_contacts")) || [];
 
-// Initialization
-document.addEventListener("DOMContentLoaded", async () => {
-  // Restore any localStorage keys wiped by an update or WebView reset
-  await restoreFromBackup();
-  // Re-read keys that may have just been restored
-  tavilyApiKey = localStorage.getItem("tavily_key") || tavilyApiKey;
-  geminiApiKey = localStorage.getItem("gemini_key") || geminiApiKey;
-  const restoredTracker = localStorage.getItem("applications_tracker");
-  if (restoredTracker) trackerData = JSON.parse(restoredTracker);
-  const restoredContacts = localStorage.getItem("bookmarked_contacts");
-  if (restoredContacts) bookmarkedContacts = JSON.parse(restoredContacts);
+// ── Startup: two-phase init for instant first paint ──────────────────────────
+const _ric = window.requestIdleCallback
+  ? cb => window.requestIdleCallback(cb, { timeout: 800 })
+  : cb => setTimeout(cb, 0);
 
+document.addEventListener("DOMContentLoaded", () => {
+  // ── Phase 1: paint the UI shell instantly (synchronous, no I/O) ──────────
   renderRoles();
   renderRoleDropdown();
   renderStageChips();
-  selectRole("llmops"); // default selected
-  
-  // Sync inputs to settings modal fields
+  selectRole("llmops");
   document.getElementById("settings-gemini").value = geminiApiKey;
   document.getElementById("settings-tavily").value = tavilyApiKey;
-
-  // Render initial application tracker data and metrics
   renderTracker();
   updateSummaryBanner();
-
-  // Generate dynamic, portable browser single-click bookmarklet
-  generateBookmarkletLink();
-
-  // Process potential browser single-click integration events (bookmarklet redirects)
-  handleBookmarkletRedirect();
-
-  // Attempt automatic key extraction from .env
-  await loadEnvKeys();
-
-  // Render saved connections
   renderBookmarkedContacts();
-
-  // Auto-summon mascot in bottom-right corner
   spawnMascotBottomRight();
   octoSetState("idle");
-  startOctopusEngine();
-  setTimeout(() => octoShowBubble("> ready.\n> let's get you hired.", 3500), 1200);
 
-  // Wire idle detection to all user input events
-  ["mousemove","keydown","mousedown","touchstart","scroll"].forEach(evt =>
-    document.addEventListener(evt, octoResetIdleTimer, { passive: true })
-  );
+  // Show Tauri window now — first paint is ready, no white flash
+  if (window.__TAURI__?.window) {
+    try { window.__TAURI__.window.getCurrentWindow().show(); } catch (_) {}
+  }
 
-  // Wire textarea typing to context-aware comments
-  document.querySelectorAll("textarea, input[type='text']").forEach(el => {
-    el.addEventListener("input", octoOnTyping);
+  // ── Phase 2: everything else deferred until after first paint ─────────────
+  _ric(async () => {
+    // Restore IndexedDB backup (non-blocking — re-renders if data was missing)
+    await restoreFromBackup();
+    tavilyApiKey = localStorage.getItem("tavily_key") || tavilyApiKey;
+    geminiApiKey = localStorage.getItem("gemini_key") || geminiApiKey;
+    const restoredTracker = localStorage.getItem("applications_tracker");
+    if (restoredTracker) { trackerData = JSON.parse(restoredTracker); renderTracker(); updateSummaryBanner(); }
+    const restoredContacts = localStorage.getItem("bookmarked_contacts");
+    if (restoredContacts) { bookmarkedContacts = JSON.parse(restoredContacts); renderBookmarkedContacts(); }
+    document.getElementById("settings-gemini").value = geminiApiKey;
+    document.getElementById("settings-tavily").value = tavilyApiKey;
+
+    generateBookmarkletLink();
+    handleBookmarkletRedirect();
+    loadEnvKeys(); // fire-and-forget — updates keys when .env resolves
+
+    startOctopusEngine();
+    setTimeout(() => octoShowBubble("> ready.\n> let's get you hired.", 3500), 200);
+
+    ["mousemove","keydown","mousedown","touchstart","scroll"].forEach(evt =>
+      document.addEventListener(evt, octoResetIdleTimer, { passive: true })
+    );
+    document.querySelectorAll("textarea, input[type='text']").forEach(el => {
+      el.addEventListener("input", octoOnTyping);
+    });
   });
 });
 

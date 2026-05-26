@@ -1,6 +1,6 @@
 {
   "productName": "CareerOS",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "identifier": "com.careeros.app",
   "build": {
     "frontendDist": "../app"
@@ -14,7 +14,8 @@
         "minWidth": 960,
         "minHeight": 600,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "visible": false
       }
     ],
     "security": {
