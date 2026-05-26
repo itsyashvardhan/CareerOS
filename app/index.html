@@ -2702,6 +2702,16 @@
       <div id="js-results" style="display:flex; flex-direction:column; gap:10px;">
         <div style="color:var(--color-text-muted); font-size:0.85rem; text-align:center; padding:48px 0;">Run a scan to see results.</div>
       </div>
+
+      <!-- Saved Jobs Panel -->
+      <div style="margin-top:24px;">
+        <div style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;" onclick="jsSavedPanelToggle()">
+          <span style="font-size:.83rem; font-weight:600; color:var(--color-text-secondary); letter-spacing:.03em;">SAVED JOBS</span>
+          <span id="js-saved-count" style="display:none; background:var(--accent-indigo); color:#fff; font-size:10px; font-weight:700; padding:1px 7px; border-radius:999px;"></span>
+          <span id="js-saved-chevron" style="color:var(--color-text-muted); font-size:.75rem; margin-left:auto;">▼</span>
+        </div>
+        <div id="js-saved-panel" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -5383,8 +5393,8 @@ function jsToggleSave(key, title, company, url) {
     showToast("Saved for later! ✓");
   }
   localStorage.setItem("js_saved_jobs", JSON.stringify(jsSavedJobs));
-  // Re-render to update button state
   jsScannerRender();
+  jsRenderSavedPanel();
 }
 
 function jsSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -5827,6 +5837,11 @@ function jsScannerRender() {
               style="padding:5px 10px; border-radius:8px; border:1px solid ${saveBorder}; background:${saveBg}; color:${saveColor}; font-size:.72rem; white-space:nowrap; cursor:pointer; transition:all .15s;">
             ${saveLabel}
           </button>
+          <button onclick="jsUseForCV(${JSON.stringify(j).replace(/</g,'\\u003c')})"
+              style="padding:5px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); color:var(--color-text-muted); font-size:.72rem; white-space:nowrap; cursor:pointer; transition:all .15s;"
+              onmouseover="this.style.borderColor='var(--accent-indigo)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)'">
+            Use for CV
+          </button>
         </div>
       </div>
     </div>`;
@@ -5848,10 +5863,62 @@ function jsScannerExportJSON() {
   a.download = "jobs_export.json"; a.click();
 }
 
+let jsSavedPanelOpen = true;
+
+function jsSavedPanelToggle() {
+  jsSavedPanelOpen = !jsSavedPanelOpen;
+  const panel = document.getElementById("js-saved-panel");
+  const chevron = document.getElementById("js-saved-chevron");
+  if (panel) panel.style.display = jsSavedPanelOpen ? "flex" : "none";
+  if (chevron) chevron.textContent = jsSavedPanelOpen ? "▼" : "▶";
+}
+
+function jsRenderSavedPanel() {
+  const panel = document.getElementById("js-saved-panel");
+  const badge = document.getElementById("js-saved-count");
+  if (!panel) return;
+  if (badge) {
+    if (jsSavedJobs.length) {
+      badge.textContent = jsSavedJobs.length;
+      badge.style.display = "inline-block";
+    } else {
+      badge.style.display = "none";
+    }
+  }
+  if (!jsSavedJobs.length) {
+    panel.innerHTML = '<div style="color:var(--color-text-muted); font-size:.82rem; padding:8px 0;">No saved jobs yet.</div>';
+    return;
+  }
+  panel.innerHTML = jsSavedJobs.map(j => `
+    <div class="panel js-card" style="padding:12px; display:flex; align-items:center; gap:10px; justify-content:space-between;">
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:600; font-size:.85rem; color:var(--color-text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${jsEscHtml(j.title)}</div>
+        <div style="font-size:.75rem; color:var(--color-text-secondary); margin-top:2px;">${jsEscHtml(j.company)}</div>
+      </div>
+      <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+        ${j.url ? `<a href="${jsEscHtml(j.url)}" target="_blank" rel="noopener"
+            style="padding:5px 10px; border-radius:8px; border:1px solid rgba(247,244,235,0.1); color:var(--color-text-secondary); font-size:.72rem; text-decoration:none; white-space:nowrap;"
+            onmouseover="this.style.borderColor='var(--accent-indigo)'" onmouseout="this.style.borderColor='rgba(247,244,235,0.1)'">Apply →</a>` : ""}
+        <button onclick="jsToggleSave('${jsEscHtml(j.key.replace(/'/g,"\\'"))}', '${jsEscHtml(j.title.replace(/'/g,"\\'"))}', '${jsEscHtml(j.company.replace(/'/g,"\\'"))}', '${jsEscHtml(j.url||"")}')"
+            style="padding:5px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); color:var(--color-text-muted); font-size:.72rem; cursor:pointer; white-space:nowrap;">
+          Remove
+        </button>
+      </div>
+    </div>`).join("");
+}
+
+function jsUseForCV(j) {
+  const ta = document.getElementById("jd-text");
+  if (ta) ta.value = `${j.title} at ${j.company}${j.location ? " — " + j.location : ""}${j.description ? "\n\n" + j.description : ""}`;
+  document.getElementById("tab-prompt-engine").click();
+  showToast("Job loaded into CV Engine ✓");
+}
+
 // Populate manual search links on load
 (function jsInitManualLinks() {
   const container = document.getElementById("js-manualLinks");
   if (!container) return;
+  jsRenderSavedPanel();
   JS_MANUAL_SEARCHES.forEach(({ name, url, note }) => {
     const el = document.createElement("a");
     el.href = url; el.target = "_blank"; el.rel = "noopener";
