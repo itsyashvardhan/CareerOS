@@ -3330,6 +3330,17 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("settings-gemini").value = geminiApiKey;
     document.getElementById("settings-tavily").value = tavilyApiKey;
 
+    // Restore CV Engine drafts (persists across tab switches and restarts)
+    const savedCvText = localStorage.getItem("draft_cv_text");
+    const savedJdText = localStorage.getItem("draft_jd_text");
+    const savedRoleTitle = localStorage.getItem("draft_role_title");
+    if (savedCvText) document.getElementById("cv-text").value = savedCvText;
+    if (savedJdText) document.getElementById("jd-text").value = savedJdText;
+    if (savedRoleTitle) document.getElementById("role-title").value = savedRoleTitle;
+    document.getElementById("cv-text").addEventListener("input", e => localStorage.setItem("draft_cv_text", e.target.value));
+    document.getElementById("jd-text").addEventListener("input", e => localStorage.setItem("draft_jd_text", e.target.value));
+    document.getElementById("role-title").addEventListener("input", e => localStorage.setItem("draft_role_title", e.target.value));
+
     generateBookmarkletLink();
     handleBookmarkletRedirect();
     loadEnvKeys(); // fire-and-forget — updates keys when .env resolves
@@ -4249,11 +4260,11 @@ function renderContactsList(results, company, totalFilteredMatches) {
     
     card.innerHTML = `
       <div class="contact-info" style="max-width: 60%;">
-        <span class="contact-name">${name}</span>
-        <span class="contact-role" title="${role}">${role || 'LinkedIn Professional'}</span>
+        <span class="contact-name">${jsEscHtml(name)}</span>
+        <span class="contact-role" title="${jsEscHtml(role)}">${jsEscHtml(role) || 'LinkedIn Professional'}</span>
       </div>
       <div class="contact-actions" style="display: flex; gap: 4px; align-items: center;">
-        <a href="${contact.url}" target="_blank" class="btn btn-secondary btn-xs" style="text-decoration:none; padding: 6px 8px;">Profile ↗</a>
+        <a href="${jsEscHtml(contact.url)}" target="_blank" class="btn btn-secondary btn-xs" style="text-decoration:none; padding: 6px 8px;">Profile ↗</a>
         <button class="btn btn-secondary btn-xs" onclick="bookmarkContact('${name.replace(/'/g, "\\'")}', '${role.replace(/'/g, "\\'")}', '${company.replace(/'/g, "\\'")}', '${contact.url}')" style="padding: 6px 8px; background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.08);">Bookmark 📌</button>
         <button class="btn btn-primary btn-xs" onclick="selectContactForOutreach('${name.replace(/'/g, "\\'")}', '${role.replace(/'/g, "\\'")}', '${company.replace(/'/g, "\\'")}')" style="padding: 6px 8px; background: var(--color-product);">Outreach</button>
       </div>
@@ -4288,11 +4299,11 @@ function renderBookmarkedContacts() {
     
     card.innerHTML = `
       <div class="contact-info" style="max-width: 60%;">
-        <span class="contact-name" style="font-size: 0.85rem;">${contact.name}</span>
-        <span class="contact-role" style="font-size: 0.7rem;" title="${contact.role} at ${contact.company}">${contact.role} @ <strong>${contact.company}</strong></span>
+        <span class="contact-name" style="font-size: 0.85rem;">${jsEscHtml(contact.name)}</span>
+        <span class="contact-role" style="font-size: 0.7rem;" title="${jsEscHtml(contact.role)} at ${jsEscHtml(contact.company)}">${jsEscHtml(contact.role)} @ <strong>${jsEscHtml(contact.company)}</strong></span>
       </div>
       <div class="contact-actions" style="display: flex; gap: 4px; align-items: center;">
-        <a href="${contact.url}" target="_blank" class="btn btn-secondary btn-xs" style="text-decoration:none; padding: 4px 6px; font-size: 0.65rem;">Profile ↗</a>
+        <a href="${jsEscHtml(contact.url)}" target="_blank" class="btn btn-secondary btn-xs" style="text-decoration:none; padding: 4px 6px; font-size: 0.65rem;">Profile ↗</a>
         <button class="btn btn-primary btn-xs" onclick="selectContactForOutreach('${contact.name.replace(/'/g, "\\'")}', '${contact.role.replace(/'/g, "\\'")}', '${contact.company.replace(/'/g, "\\'")}')" style="padding: 4px 6px; font-size: 0.65rem; background: var(--color-product);">Outreach</button>
         <button class="action-icon-btn" onclick="removeBookmark(${idx})" title="Remove Saved Connection" style="padding: 3px; border-radius: 4px;">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/></svg>
@@ -5037,8 +5048,8 @@ function renderJobsList(jobs, roleTitle, countryName) {
     card.innerHTML = `
       <div class="job-title-row">
         <div>
-          <span class="job-card-title">${cleanTitle}</span>
-          <div style="font-size: 0.85rem; font-weight: 700; color: #a5b4fc; margin-top: 4px;">${companyName}</div>
+          <span class="job-card-title">${jsEscHtml(cleanTitle)}</span>
+          <div style="font-size: 0.85rem; font-weight: 700; color: #a5b4fc; margin-top: 4px;">${jsEscHtml(companyName)}</div>
         </div>
         <span class="job-board-badge ${boardClass}">${boardLabel}</span>
       </div>
