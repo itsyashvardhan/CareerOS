@@ -2435,13 +2435,15 @@
         <table class="tracker-table">
           <thead>
             <tr>
-              <th style="width: 18%;">Company</th>
-              <th style="width: 22%;">Role</th>
-              <th style="width: 10%;">Date</th>
-              <th style="width: 16%;">Location</th>
-              <th style="width: 14%;">Status</th>
-              <th style="width: 12%;">URL</th>
-              <th style="width: 8%; text-align: center;">Action</th>
+              <th style="width: 14%;">Company</th>
+              <th style="width: 18%;">Role</th>
+              <th style="width: 8%;">Date</th>
+              <th style="width: 12%;">Location</th>
+              <th style="width: 11%;">Status</th>
+              <th style="width: 9%;">URL</th>
+              <th style="width: 10%;">Follow-up</th>
+              <th style="width: 12%;">Note</th>
+              <th style="width: 6%; text-align: center;">Del</th>
             </tr>
           </thead>
           <tbody id="tracker-table-body">
@@ -2462,13 +2464,15 @@
         <table class="tracker-table">
           <thead>
             <tr>
-              <th style="width: 18%;">Company</th>
-              <th style="width: 22%;">Role</th>
-              <th style="width: 10%;">Date</th>
-              <th style="width: 16%;">Location</th>
-              <th style="width: 14%;">Status</th>
-              <th style="width: 12%;">URL</th>
-              <th style="width: 8%; text-align: center;">Action</th>
+              <th style="width: 14%;">Company</th>
+              <th style="width: 18%;">Role</th>
+              <th style="width: 8%;">Date</th>
+              <th style="width: 12%;">Location</th>
+              <th style="width: 11%;">Status</th>
+              <th style="width: 9%;">URL</th>
+              <th style="width: 10%;">Follow-up</th>
+              <th style="width: 12%;">Note</th>
+              <th style="width: 6%; text-align: center;">Del</th>
             </tr>
           </thead>
           <tbody id="tracker-rejected-table-body">
@@ -4654,6 +4658,16 @@ function renderTracker() {
            Add
          </button>`;
 
+    const followUp = app.follow_up || "";
+    const isOverdue = followUp && new Date(followUp) < new Date();
+    const followUpDisplay = followUp
+      ? `<span style="font-size:.75rem; color:${isOverdue ? '#f87171' : 'var(--color-text-muted)'}; cursor:pointer;" onclick="editFollowUp(${idx})" title="Edit follow-up date">${isOverdue ? '⚠ ' : ''}${followUp}</span>`
+      : `<button class="url-edit-btn" onclick="editFollowUp(${idx})" title="Set follow-up date" style="color:var(--color-text-muted);font-size:.7rem;">+ Date</button>`;
+
+    const noteDisplay = app.note
+      ? `<span style="font-size:.75rem;color:var(--color-text-muted);cursor:pointer;max-width:120px;display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editNote(${idx})" title="${jsEscHtml(app.note)}">${jsEscHtml(app.note)}</span>`
+      : `<button class="url-edit-btn" onclick="editNote(${idx})" title="Add note" style="color:var(--color-text-muted);font-size:.7rem;">+ Note</button>`;
+
     tr.innerHTML = `
       <td><span class="tracker-company">${jsEscHtml(app.company)}</span></td>
       <td><span class="tracker-role">${jsEscHtml(app.role)}</span></td>
@@ -4669,6 +4683,8 @@ function renderTracker() {
         </select>
       </td>
       <td>${urlCell}</td>
+      <td>${followUpDisplay}</td>
+      <td>${noteDisplay}</td>
       <td style="text-align: center;">
         <button class="action-icon-btn" onclick="deleteTrackerRow(${idx})" title="Delete Application">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/></svg>
@@ -4687,10 +4703,10 @@ function renderTracker() {
 
   // Handle empty state displays inside each table
   if (activeCount === 0) {
-    activeTbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 2.5rem; color: var(--color-text-muted); font-size: 0.85rem;">No active job applications in your pipeline. Click "+ Add Entry" to begin!</td></tr>`;
+    activeTbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 2.5rem; color: var(--color-text-muted); font-size: 0.85rem;">No active job applications in your pipeline. Click "+ Add Entry" to begin!</td></tr>`;
   }
   if (rejectedCount === 0) {
-    rejectedTbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding: 2.5rem; color: var(--color-text-muted); font-size: 0.85rem;">No archived rejections found. Keep pushing forward!</td></tr>`;
+    rejectedTbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 2.5rem; color: var(--color-text-muted); font-size: 0.85rem;">No archived rejections found. Keep pushing forward!</td></tr>`;
   }
 }
 
@@ -4794,6 +4810,24 @@ function editRowUrl(idx) {
   const newUrl = prompt("Enter job application URL:", current);
   if (newUrl === null) return;
   trackerData[idx].url = newUrl.trim();
+  localStorage.setItem("applications_tracker", JSON.stringify(trackerData));
+  renderTracker();
+}
+
+function editFollowUp(idx) {
+  const current = trackerData[idx].follow_up || "";
+  const val = prompt("Follow-up date (YYYY-MM-DD):", current || new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10));
+  if (val === null) return;
+  trackerData[idx].follow_up = val.trim();
+  localStorage.setItem("applications_tracker", JSON.stringify(trackerData));
+  renderTracker();
+}
+
+function editNote(idx) {
+  const current = trackerData[idx].note || "";
+  const val = prompt("Note for this application:", current);
+  if (val === null) return;
+  trackerData[idx].note = val.trim();
   localStorage.setItem("applications_tracker", JSON.stringify(trackerData));
   renderTracker();
 }
