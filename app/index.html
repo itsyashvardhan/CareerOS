@@ -2691,9 +2691,18 @@
   <div class="form-group">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
       <label class="form-label" for="settings-gemini" style="margin-bottom: 0;">Gemini API Key</label>
-      <a href="https://aistudio.google.com/" target="_blank" class="link-action" style="font-size: 0.7rem; text-decoration: none; font-weight: 600; color: #38bdf8;">Get Gemini Key ↗</a>
+      <a href="https://aistudio.google.com/" target="_blank" class="link-action" style="font-size: 0.7rem; text-decoration: none; font-weight: 600; color: #38bdf8;">Get key ↗</a>
     </div>
     <input type="text" id="settings-gemini" placeholder="AIzaSy..." />
+  </div>
+
+  <div class="form-group" style="margin-top: 1rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+      <label class="form-label" for="settings-tavily" style="margin-bottom: 0;">Tavily API Key</label>
+      <a href="https://app.tavily.com/" target="_blank" class="link-action" style="font-size: 0.7rem; text-decoration: none; font-weight: 600; color: #38bdf8;">Get key ↗</a>
+    </div>
+    <input type="text" id="settings-tavily" placeholder="tvly-..." />
+    <div style="font-size: 0.72rem; color: var(--color-text-muted); margin-top: 4px;">Used for job search and contact discovery.</div>
   </div>
 
   <div style="font-size: 0.75rem; color: var(--color-text-secondary); margin-bottom: 1.25rem; line-height: 1.45; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid rgba(255,255,255,0.04); margin-top: 1rem;">
@@ -3156,8 +3165,8 @@ const countryData = {
   indonesia: { name: "Indonesia", adjective: "Indonesian", flag: "🇮🇩" }
 };
 
-// Global Credentials Keys (Defaulted to System .env variables found locally)
-const tavilyApiKey = "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";
+// Global Credentials Keys — stored in localStorage, never hardcoded
+let tavilyApiKey = localStorage.getItem("tavily_key") || "";
 let geminiApiKey = localStorage.getItem("gemini_key") || "";
 
 // Pre-populated application tracking data matching user screenshot exactly
@@ -3285,6 +3294,8 @@ function checkApiKeyStatus() {
 function openSettings() {
   document.getElementById("settings-backdrop").style.display = "block";
   document.getElementById("settings-panel").style.display = "block";
+  document.getElementById("settings-gemini").value = geminiApiKey;
+  document.getElementById("settings-tavily").value = tavilyApiKey;
 }
 
 function closeSettings() {
@@ -3294,10 +3305,12 @@ function closeSettings() {
 
 function saveSettings() {
   geminiApiKey = document.getElementById("settings-gemini").value.trim();
+  tavilyApiKey = document.getElementById("settings-tavily").value.trim();
   localStorage.setItem("gemini_key", geminiApiKey);
+  localStorage.setItem("tavily_key", tavilyApiKey);
   closeSettings();
   checkApiKeyStatus();
-  showToast("Gemini key saved!");
+  showToast("Credentials saved!");
 }
 
 // Switch between Primary modules defensively (supports both desktop horizontal tabs and mobile sidebar links)
