@@ -56,7 +56,7 @@ CareerOS stores your complete profile and pre-fills every ATS form with one clic
 
 ## The User
 
-**Aarohi, 22, Bangalore.**  
+**Yashvardhan, 21, Bangalore.**  
 Computer Science grad. 7.8 CGPA. No internships at big names. Knows Python, SQL, some React.  
 She's applying for Customer Success, Solutions Engineer, and AI Trainer roles across India and Singapore.  
 She has 3 months before she needs income. She has no network. She has CareerOS.
