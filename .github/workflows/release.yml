@@ -10,32 +10,11 @@ env:
 
 jobs:
 
-  # ── Desktop: Windows, macOS (ARM + Intel), Linux ───────────────────────────
-  release-desktop:
+  # ── Windows NSIS (.exe) only ───────────────────────────────────────────────
+  release-windows:
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos-latest
-            args: --target aarch64-apple-darwin
-            artifact_suffix: macOS-arm64
-            rust_target: aarch64-apple-darwin
-          - platform: macos-latest
-            args: --target x86_64-apple-darwin
-            artifact_suffix: macOS-x64
-            rust_target: x86_64-apple-darwin
-          - platform: ubuntu-22.04
-            args: ''
-            artifact_suffix: Linux-x64
-            rust_target: x86_64-unknown-linux-gnu
-          - platform: windows-latest
-            args: ''
-            artifact_suffix: Windows-x64
-            rust_target: x86_64-pc-windows-msvc
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -43,24 +22,14 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.rust_target }}
-
-      - name: Linux system deps
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf
+          targets: x86_64-pc-windows-msvc
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
 
-      - name: Build and publish
+      - name: Build and publish (NSIS only)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -72,20 +41,16 @@ jobs:
           releaseBody: |
             ## CareerOS ${{ github.ref_name }}
 
-            | Platform | File | Notes |
-            |---|---|---|
-            | Windows | `CareerOS-*-Windows-x64.exe` | **Recommended — supports auto-update** |
-            | Windows | `CareerOS-*-Windows-x64.msi` | Manual install only, no auto-update |
-            | macOS Apple Silicon | `CareerOS-*-macOS-arm64.dmg` | |
-            | macOS Intel | `CareerOS-*-macOS-x64.dmg` | |
-            | Linux | `CareerOS-*-Linux-x64.AppImage` | |
-            | Linux | `CareerOS-*-Linux-x64.deb` | |
+            | Platform | File |
+            |---|---|
+            | Windows | `CareerOS-*-Windows-x64.exe` |
+
+            **Auto-update**: existing installs will be notified automatically.
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          args: --bundles nsis
 
-      - name: Rename Windows artifacts
-        if: matrix.platform == 'windows-latest'
+      - name: Rename and upload NSIS exe
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -101,48 +66,9 @@ jobs:
             gh release upload $env:TAG $dest --clobber
           }
 
-      - name: Rename macOS artifacts
-        if: matrix.platform == 'macos-latest'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
-          SUFFIX: ${{ matrix.artifact_suffix }}
-          RUST_TARGET: ${{ matrix.rust_target }}
-        run: |
-          ver="${TAG#v}"
-          dmg=$(find "src-tauri/target/${RUST_TARGET}/release/bundle/dmg" -name "*.dmg" 2>/dev/null | head -1)
-          if [ -n "$dmg" ]; then
-            dest="CareerOS-${ver}-${SUFFIX}.dmg"
-            cp "$dmg" "$dest"
-            gh release upload "$TAG" "$dest" --clobber
-          fi
-
-      - name: Rename Linux artifacts
-        if: matrix.platform == 'ubuntu-22.04'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          ver="${TAG#v}"
-          src="src-tauri/target/release/bundle"
-
-          appimage=$(find "$src/appimage" -name "*.AppImage" 2>/dev/null | head -1)
-          if [ -n "$appimage" ]; then
-            dest="CareerOS-${ver}-Linux-x64.AppImage"
-            cp "$appimage" "$dest"
-            gh release upload "$TAG" "$dest" --clobber
-          fi
-
-          deb=$(find "$src/deb" -name "*.deb" 2>/dev/null | head -1)
-          if [ -n "$deb" ]; then
-            dest="CareerOS-${ver}-Linux-x64.deb"
-            cp "$deb" "$dest"
-            gh release upload "$TAG" "$dest" --clobber
-          fi
-
-  # ── Finalize updater: sign bundles + generate latest.json ──────────────────
+  # ── Finalize updater: sign .nsis.zip + generate latest.json ───────────────
   finalize-updater:
-    needs: release-desktop
+    needs: release-windows
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -159,26 +85,22 @@ jobs:
       - name: Install tauri-cli
         run: cargo install tauri-cli --version "^2" --locked
 
-      - name: Download update bundles from release
+      - name: Download .nsis.zip from release
         run: |
           mkdir -p dist
           cd dist
           gh release download "$TAG" --pattern "*.nsis.zip*" --skip-existing 2>/dev/null || true
-          gh release download "$TAG" --pattern "*.app.tar.gz*" --skip-existing 2>/dev/null || true
-          gh release download "$TAG" --pattern "*.AppImage.tar.gz*" --skip-existing 2>/dev/null || true
           ls -la
 
-      - name: Sign any unsigned update bundles
+      - name: Sign update bundle
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          # --private-key expects base64(full_minisign_file_content) including the
-          # "untrusted comment:" header — same format as the pubkey in tauri.conf.json.
-          # Our secret is raw file content, so base64-encode the whole thing first.
+          # Secret is raw minisign file content; --private-key expects base64(full_file_content)
           ENCODED_KEY=$(printf '%s\n' "$TAURI_SIGNING_PRIVATE_KEY" | base64 -w 0)
           cd dist
-          for f in *.nsis.zip *.app.tar.gz *.AppImage.tar.gz; do
+          for f in *.nsis.zip; do
             [ -f "$f" ] || continue
             [ -f "${f}.sig" ] && { echo "  already signed: $f"; continue; }
             echo "  signing: $f"
@@ -188,7 +110,7 @@ jobs:
               "$f"
           done
 
-      - name: Upload any new .sig files
+      - name: Upload .sig file
         run: |
           cd dist
           for sig in *.sig; do
@@ -203,38 +125,18 @@ jobs:
           base_url="https://github.com/itsyashvardhan/CareerOS/releases/download/${TAG}"
           cd dist
 
-          platforms="{}"
-
           win=$(ls *.nsis.zip 2>/dev/null | grep -v '\.sig$' | head -1)
-          if [ -n "$win" ] && [ -f "${win}.sig" ]; then
-            sig=$(cat "${win}.sig")
-            platforms=$(echo "$platforms" | jq --arg u "$base_url/$win" --arg s "$sig" \
-              '. + {"windows-x86_64": {"url":$u,"signature":$s}}')
+          if [ -z "$win" ] || [ ! -f "${win}.sig" ]; then
+            echo "ERROR: no signed .nsis.zip found"; ls -la; exit 1
           fi
 
-          mac_arm=$(ls 2>/dev/null *.app.tar.gz | grep -i aarch64 | head -1)
-          if [ -n "$mac_arm" ] && [ -f "${mac_arm}.sig" ]; then
-            sig=$(cat "${mac_arm}.sig")
-            platforms=$(echo "$platforms" | jq --arg u "$base_url/$mac_arm" --arg s "$sig" \
-              '. + {"darwin-aarch64": {"url":$u,"signature":$s}}')
-          fi
-
-          mac_x64=$(ls 2>/dev/null *.app.tar.gz | grep -i x86_64 | head -1)
-          if [ -n "$mac_x64" ] && [ -f "${mac_x64}.sig" ]; then
-            sig=$(cat "${mac_x64}.sig")
-            platforms=$(echo "$platforms" | jq --arg u "$base_url/$mac_x64" --arg s "$sig" \
-              '. + {"darwin-x86_64": {"url":$u,"signature":$s}}')
-          fi
-
-          lin=$(ls 2>/dev/null *.AppImage.tar.gz | grep -v '\.sig$' | head -1)
-          if [ -n "$lin" ] && [ -f "${lin}.sig" ]; then
-            sig=$(cat "${lin}.sig")
-            platforms=$(echo "$platforms" | jq --arg u "$base_url/$lin" --arg s "$sig" \
-              '. + {"linux-x86_64": {"url":$u,"signature":$s}}')
-          fi
-
-          echo "$platforms" | jq \
-            --arg v "v$ver" --arg d "$pub_date" \
-            '{"version":$v,"notes":"","pub_date":$d,"platforms":.}' > latest.json
+          sig=$(cat "${win}.sig")
+          jq -n \
+            --arg v "v$ver" \
+            --arg d "$pub_date" \
+            --arg u "$base_url/$win" \
+            --arg s "$sig" \
+            '{"version":$v,"notes":"","pub_date":$d,"platforms":{"windows-x86_64":{"url":$u,"signature":$s}}}' \
+            > latest.json
           cat latest.json
           gh release upload "$TAG" latest.json --clobber

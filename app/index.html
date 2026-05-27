@@ -1989,6 +1989,7 @@
       #pwa-install-toast { bottom: 1rem; left: 1rem; right: 1rem; transform: none; }
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 </head>
 <body>
 
@@ -2057,6 +2058,14 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
         <span>Job Scanner</span>
       </button>
+      <button id="sidemenu-skill-gaps" class="sidebar-link" onclick="switchModule('skill-gaps')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+        <span>Skill Gaps</span>
+      </button>
+      <button id="sidemenu-network-graph" class="sidebar-link" onclick="switchModule('network-graph')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        <span>Network</span>
+      </button>
     </nav>
 
     <div class="sidebar-footer">
@@ -2099,6 +2108,8 @@
       <button id="tab-app-tracker" class="module-tab" onclick="switchModule('app-tracker')">Tracker Board</button>
       <button id="tab-job-search" class="module-tab" onclick="switchModule('job-search')">Job Search</button>
       <button id="tab-job-scanner" class="module-tab" onclick="switchModule('job-scanner')">Job Scanner</button>
+      <button id="tab-skill-gaps" class="module-tab" onclick="switchModule('skill-gaps')">Skill Gaps</button>
+      <button id="tab-network-graph" class="module-tab" onclick="switchModule('network-graph')">Network</button>
     </nav>
     
     <!-- API Warning Alert Banner -->
@@ -2115,7 +2126,14 @@
     <div class="workspace-grid">
       <!-- Left Configuration Panel -->
       <div class="main-controls">
-        
+
+        <!-- CV Engine Inner Tab Bar -->
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+          <button id="cv-tab-main" onclick="switchCVEngineTab('main')" style="flex:1; padding:7px 0; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(204,104,73,0.18); color:var(--color-text-primary); font-size:.8rem; font-weight:600; cursor:pointer; letter-spacing:.02em;">CV &amp; Prompt</button>
+          <button id="cv-tab-rewrite" onclick="switchCVEngineTab('rewrite')" style="flex:1; padding:7px 0; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.03); color:var(--color-text-muted); font-size:.8rem; font-weight:600; cursor:pointer; letter-spacing:.02em;">✏ Rewrite</button>
+        </div>
+
+        <div id="cv-main-panel">
         <!-- Role Selector Panel -->
         <div class="panel">
           <div class="panel-title" style="border: none; padding-bottom: 0;">
@@ -2217,6 +2235,35 @@
           </div>
 
         </div>
+        </div><!-- /cv-main-panel -->
+
+        <!-- Rewrite Panel -->
+        <div id="cv-rewrite-panel" style="display:none;">
+          <div style="margin-bottom:16px;">
+            <label style="font-size:.78rem; color:var(--color-text-muted); margin-bottom:6px; display:block;">Paste the CV bullet or section to rewrite</label>
+            <textarea id="rewrite-input" rows="5" placeholder="E.g. 'Worked on projects related to customer onboarding and helped the team with various tasks'" style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:10px 14px; color:var(--color-text-primary); font-size:.85rem; width:100%; box-sizing:border-box; resize:vertical;"></textarea>
+          </div>
+          <div style="margin-bottom:16px;">
+            <label style="font-size:.78rem; color:var(--color-text-muted); margin-bottom:6px; display:block;">Target role (pulled from role title field, or type here)</label>
+            <input id="rewrite-target-role" type="text" placeholder="e.g. Solutions Engineer" style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:10px 14px; color:var(--color-text-primary); font-size:.85rem; width:100%; box-sizing:border-box;" />
+          </div>
+          <button onclick="runCVRewrite()" id="btn-cv-rewrite" class="btn btn-glow-emerald" style="width:100%; padding:10px; font-size:.88rem; font-weight:600; border-radius:10px; cursor:pointer;">
+            ✨ Rewrite with Gemini
+          </button>
+          <!-- Side-by-side diff output -->
+          <div id="rewrite-output" style="display:none; margin-top:20px; grid-template-columns:1fr 1fr; gap:16px;">
+            <div>
+              <div style="font-size:.72rem; color:var(--color-text-muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.05em;">Before</div>
+              <div id="rewrite-before" style="background:rgba(248,113,113,0.06); border:1px solid rgba(248,113,113,0.2); border-radius:10px; padding:14px; font-size:.84rem; line-height:1.7; color:var(--color-text-secondary); white-space:pre-wrap;"></div>
+            </div>
+            <div>
+              <div style="font-size:.72rem; color:var(--accent-emerald,#4ade80); margin-bottom:6px; text-transform:uppercase; letter-spacing:.05em;">After</div>
+              <div id="rewrite-after" style="background:rgba(74,222,128,0.06); border:1px solid rgba(74,222,128,0.2); border-radius:10px; padding:14px; font-size:.84rem; line-height:1.7; color:var(--color-text-secondary); white-space:pre-wrap;"></div>
+            </div>
+          </div>
+          <button id="btn-copy-rewrite" onclick="copyRewrite()" style="display:none; margin-top:12px; width:100%; padding:9px; background:rgba(74,222,128,0.1); border:1px solid rgba(74,222,128,0.25); color:var(--accent-emerald,#4ade80); border-radius:10px; font-size:.85rem; font-weight:600; cursor:pointer;">Copy rewritten version</button>
+        </div><!-- /cv-rewrite-panel -->
+
       </div>
 
       <!-- Right sticky preview side -->
@@ -2741,6 +2788,39 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- MODULE 6: Skill Gap Dashboard -->
+<div id="module-skill-gaps" class="module-view">
+  <div style="padding: 0 2px 24px;">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
+      <div>
+        <h2 style="font-size:1.35rem; font-weight:700; color:var(--color-text-primary); margin:0 0 4px;">Skill Gap Dashboard</h2>
+        <p style="font-size:0.82rem; color:var(--color-text-muted); margin:0;">Top skills missing across your scored jobs — ranked by frequency</p>
+      </div>
+      <button onclick="renderSkillGaps()" style="padding:8px 16px; background:var(--accent-indigo); color:#fff; border:none; border-radius:8px; font-size:0.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        Refresh
+      </button>
+    </div>
+    <div id="skill-gaps-container"></div>
+  </div>
+</div>
+
+<div id="module-network-graph" class="module-view" style="display:none;">
+  <div style="padding:24px 28px; border-bottom:1px solid rgba(247,244,235,0.06);">
+    <h2 style="font-size:1.1rem; font-weight:700; margin:0 0 4px;">Referral Network</h2>
+    <p style="color:var(--color-text-muted); font-size:.82rem; margin:0;">Your bookmarked contacts visualized. Click any node to draft outreach.</p>
+  </div>
+  <div style="padding:20px 28px; height:calc(100vh - 140px); position:relative;">
+    <div id="network-graph-container" style="width:100%; height:100%; border-radius:12px; border:1px solid rgba(255,255,255,0.06); background:rgba(0,0,0,0.2); overflow:hidden; position:relative;">
+      <svg id="network-svg" width="100%" height="100%"></svg>
+      <div id="network-empty" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; color:var(--color-text-muted); font-size:.85rem; text-align:center; padding:40px;">
+        No bookmarked contacts yet.<br>Save contacts in the Outreach Finder to see your network here.
+      </div>
+    </div>
+  </div>
+  <div id="network-tooltip" style="display:none; position:fixed; background:rgba(24,23,21,0.95); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:10px 14px; font-size:.8rem; color:var(--color-text-secondary); pointer-events:none; z-index:9999; max-width:200px; line-height:1.5;"></div>
 </div>
 
 </main> <!-- closes .app-main -->
@@ -3695,6 +3775,10 @@ function switchModule(moduleName) {
 
   // Mascot context awareness on tab switch
   octoOnModuleSwitch(moduleName);
+
+  // Auto-render skill gaps when switching to that module
+  if (moduleName === 'skill-gaps') renderSkillGaps();
+  if (moduleName === 'network-graph') renderNetworkGraph();
 }
 
 // Toggle mobile sidebar drawer overlay
@@ -4413,6 +4497,79 @@ function copyIt() {
     showToast("Prompt copied to clipboard!");
   }).catch(err => {
     alert("Unable to copy to clipboard automatically. Please select text manually and copy.");
+  });
+}
+
+// ==========================================
+// CV ENGINE — REWRITE TAB
+// ==========================================
+
+function switchCVEngineTab(tab) {
+  const mainPanel = document.getElementById('cv-main-panel');
+  const rewritePanel = document.getElementById('cv-rewrite-panel');
+  const tabMain = document.getElementById('cv-tab-main');
+  const tabRewrite = document.getElementById('cv-tab-rewrite');
+  const activeStyle = { background: 'rgba(204,104,73,0.18)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--color-text-primary)' };
+  const inactiveStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--color-text-muted)' };
+  if (tab === 'main') {
+    mainPanel.style.display = '';
+    rewritePanel.style.display = 'none';
+    Object.assign(tabMain.style, activeStyle);
+    Object.assign(tabRewrite.style, inactiveStyle);
+  } else {
+    mainPanel.style.display = 'none';
+    rewritePanel.style.display = 'block';
+    Object.assign(tabRewrite.style, activeStyle);
+    Object.assign(tabMain.style, inactiveStyle);
+    // Pre-fill role from role-title input
+    const roleTitle = document.getElementById('role-title');
+    const rewriteRole = document.getElementById('rewrite-target-role');
+    if (roleTitle && roleTitle.value.trim() && !rewriteRole.value.trim()) {
+      rewriteRole.value = roleTitle.value.trim();
+    }
+  }
+}
+
+async function runCVRewrite() {
+  const original = document.getElementById('rewrite-input').value.trim();
+  if (!original) { alert('Paste a CV bullet or section to rewrite.'); return; }
+  const roleEl = document.getElementById('rewrite-target-role');
+  const role = (roleEl && roleEl.value.trim()) || (document.getElementById('role-title') && document.getElementById('role-title').value.trim()) || 'the target role';
+  if (!geminiApiKey) { alert('Add Gemini API key in Settings'); return; }
+  const btn = document.getElementById('btn-cv-rewrite');
+  btn.textContent = 'Rewriting…';
+  btn.disabled = true;
+  const profileCtx = (typeof buildProfileContext === 'function') ? buildProfileContext() : '';
+  const prompt = `Rewrite this CV bullet/section for a ${role} application. Make it achievement-oriented, quantified where possible, and ATS-friendly. Use strong action verbs. Keep it concise.\n\nOriginal:\n${original}\n\nCandidate profile:\n${profileCtx}\n\nReturn ONLY the rewritten version, no explanation, no preamble.`;
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+    });
+    const data = await res.json();
+    const rewritten = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+    if (!rewritten) throw new Error('Empty response from Gemini');
+    document.getElementById('rewrite-before').textContent = original;
+    document.getElementById('rewrite-after').textContent = rewritten;
+    const output = document.getElementById('rewrite-output');
+    output.style.display = 'grid';
+    document.getElementById('btn-copy-rewrite').style.display = 'block';
+  } catch (err) {
+    alert('Rewrite failed: ' + err.message);
+  } finally {
+    btn.textContent = '✨ Rewrite with Gemini';
+    btn.disabled = false;
+  }
+}
+
+function copyRewrite() {
+  const text = document.getElementById('rewrite-after').textContent;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Rewritten version copied!');
+  }).catch(() => {
+    alert('Unable to copy automatically. Please select and copy manually.');
   });
 }
 
@@ -5836,6 +5993,110 @@ let jsActiveSourceFilters = new Set();
 let jsSavedJobs = JSON.parse(localStorage.getItem("js_saved_jobs") || "[]");
 const jsScoreCache = new Map(); // key: "title|company" → {score, reason}
 
+// ── Skill Gap Dashboard ──────────────────────────────────────────────────────
+const SKILL_RESOURCE_MAP = {
+  'sql': 'https://www.coursera.org/learn/sql-for-data-science',
+  'python': 'https://www.freecodecamp.org/learn/scientific-computing-with-python/',
+  'excel': 'https://support.microsoft.com/excel',
+  'salesforce': 'https://trailhead.salesforce.com/',
+  'react': 'https://react.dev/learn',
+  'javascript': 'https://javascript.info/',
+  'typescript': 'https://www.typescriptlang.org/docs/',
+  'java': 'https://www.coursera.org/learn/java-programming',
+  'c++': 'https://www.learncpp.com/',
+  'machine learning': 'https://www.coursera.org/learn/machine-learning',
+  'data analysis': 'https://www.coursera.org/learn/data-analysis-with-python',
+  'tableau': 'https://www.tableau.com/learn/training',
+  'power bi': 'https://learn.microsoft.com/en-us/power-bi/',
+  'aws': 'https://aws.amazon.com/training/',
+  'docker': 'https://docs.docker.com/get-started/',
+  'git': 'https://learngitbranching.js.org/',
+  'node': 'https://nodejs.org/en/learn',
+  'nodejs': 'https://nodejs.org/en/learn',
+  'figma': 'https://www.figma.com/resources/learn-design/',
+  'communication': 'https://www.coursera.org/learn/wharton-communication-skills',
+};
+
+function getSkillResource(skill) {
+  const key = skill.toLowerCase().trim();
+  if (SKILL_RESOURCE_MAP[key]) return SKILL_RESOURCE_MAP[key];
+  for (const [k, v] of Object.entries(SKILL_RESOURCE_MAP)) {
+    if (key.includes(k) || k.includes(key)) return v;
+  }
+  return `https://www.coursera.org/search?query=${encodeURIComponent(skill)}`;
+}
+
+function renderSkillGaps() {
+  const container = document.getElementById('skill-gaps-container');
+  if (!container) return;
+
+  if (jsScoreCache.size === 0) {
+    container.innerHTML = `<div style="text-align:center; padding:48px 24px; color:var(--color-text-muted); font-size:0.88rem; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:12px;">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px; display:block; opacity:0.35;"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+      Run job match scoring in the Scanner tab first. Scored jobs will populate your skill gaps here.
+    </div>`;
+    return;
+  }
+
+  // Aggregate missing_skills across all cached scores
+  const freq = new Map();
+  for (const val of jsScoreCache.values()) {
+    const skills = val.missing_skills || [];
+    for (const s of skills) {
+      if (!s || !s.trim()) continue;
+      const norm = s.trim();
+      freq.set(norm, (freq.get(norm) || 0) + 1);
+    }
+  }
+
+  if (freq.size === 0) {
+    container.innerHTML = `<div style="text-align:center; padding:48px 24px; color:var(--color-text-muted); font-size:0.88rem; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:12px;">No missing skills found in your scored jobs. Great coverage!</div>`;
+    return;
+  }
+
+  // Sort descending, take top 15
+  const sorted = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15);
+
+  // Load persisted statuses
+  let statusMap = {};
+  try { statusMap = JSON.parse(localStorage.getItem('skill_gap_status') || '{}'); } catch(e) {}
+
+  const rows = sorted.map(([skill, count]) => {
+    const status = statusMap[skill] || null;
+    const resourceUrl = getSkillResource(skill);
+    const learningActive = status === 'learning';
+    const doneActive = status === 'done';
+    return `<div style="display:flex; align-items:center; gap:12px; padding:10px 14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:9px; margin-bottom:8px; flex-wrap:wrap;">
+      <span style="flex:1; min-width:120px; font-size:0.88rem; font-weight:600; color:var(--color-text-primary);">${skill}</span>
+      <span style="background:rgba(248,113,113,0.12); border:1px solid rgba(248,113,113,0.25); color:#f87171; font-size:11px; padding:2px 8px; border-radius:5px; white-space:nowrap;">×${count}</span>
+      <a href="${resourceUrl}" target="_blank" rel="noopener" style="color:var(--accent-indigo); font-size:.78rem; text-decoration:underline; white-space:nowrap;">Learn →</a>
+      <div style="display:flex; gap:6px; margin-left:auto;">
+        <button onclick="setSkillStatus('${skill.replace(/'/g,"\\'")}','learning')" style="padding:3px 12px; border-radius:99px; font-size:11px; font-weight:600; cursor:pointer; border:1px solid; transition:all .15s; ${learningActive ? 'background:#4f46e5; border-color:#4f46e5; color:#fff;' : 'background:transparent; border-color:rgba(79,70,229,0.4); color:#a5b4fc;'}">
+          ${learningActive ? '● Learning' : 'Mark Learning'}
+        </button>
+        <button onclick="setSkillStatus('${skill.replace(/'/g,"\\'")}','done')" style="padding:3px 12px; border-radius:99px; font-size:11px; font-weight:600; cursor:pointer; border:1px solid; transition:all .15s; ${doneActive ? 'background:#16a34a; border-color:#16a34a; color:#fff;' : 'background:transparent; border-color:rgba(22,163,74,0.4); color:#86efac;'}">
+          ${doneActive ? '✓ Done' : 'Mark Done'}
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `<div style="font-size:0.75rem; color:var(--color-text-muted); margin-bottom:12px;">${freq.size} unique skills found across ${jsScoreCache.size} scored jobs. Showing top ${sorted.length}.</div>${rows}`;
+}
+
+function setSkillStatus(skill, status) {
+  let statusMap = {};
+  try { statusMap = JSON.parse(localStorage.getItem('skill_gap_status') || '{}'); } catch(e) {}
+  if (statusMap[skill] === status) {
+    delete statusMap[skill]; // toggle off
+  } else {
+    statusMap[skill] = status;
+  }
+  localStorage.setItem('skill_gap_status', JSON.stringify(statusMap));
+  renderSkillGaps();
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 function jsToggleSave(key, title, company, url) {
   const idx = jsSavedJobs.findIndex(j => j.key === key);
   if (idx >= 0) {
@@ -6607,21 +6868,162 @@ Be specific and direct. If you don't know something, say so briefly rather than 
 ">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
     <div style="font-weight:700; font-size:1rem;" id="js-prep-title">Interview Prep</div>
-    <button onclick="jsClosePrepPanel()" style="background:none;border:none;color:var(--color-text-muted);font-size:1.2rem;cursor:pointer;">&#x2715;</button>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button id="js-practice-toggle" onclick="jsTogglePracticeMode()" style="
+        background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.35);
+        color:#a5b4fc; font-size:.75rem; font-weight:600; letter-spacing:.04em;
+        padding:4px 12px; border-radius:6px; cursor:pointer; transition:background .2s;
+      ">Practice</button>
+      <button onclick="jsClosePrepPanel()" style="background:none;border:none;color:var(--color-text-muted);font-size:1.2rem;cursor:pointer;">&#x2715;</button>
+    </div>
   </div>
   <div id="js-prep-content" style="font-size:.85rem; line-height:1.7; color:var(--color-text-secondary); white-space:pre-wrap;"></div>
 </div>
 
 <script>
+let jsPrepRawText = "";
+let jsPracticeMode = false;
+
 function jsOpenPrepPanel(role, company) {
+  jsPracticeMode = false;
+  jsPrepRawText = "";
+  const tog = document.getElementById("js-practice-toggle");
+  if (tog) { tog.textContent = "Practice"; tog.style.background = "rgba(99,102,241,0.15)"; }
   document.getElementById("js-prep-title").textContent = "Interview Prep - " + role + " @ " + company;
   document.getElementById("js-prep-content").textContent = "Generating questions...";
+  document.getElementById("js-prep-content").style.whiteSpace = "pre-wrap";
   document.getElementById("js-prep-panel").style.transform = "translateX(0)";
   jsGeneratePrepQuestions(role, company);
 }
 
 function jsClosePrepPanel() {
   document.getElementById("js-prep-panel").style.transform = "translateX(100%)";
+}
+
+function jsTogglePracticeMode() {
+  jsPracticeMode = !jsPracticeMode;
+  const tog = document.getElementById("js-practice-toggle");
+  const content = document.getElementById("js-prep-content");
+  if (jsPracticeMode) {
+    tog.textContent = "Read";
+    tog.style.background = "rgba(74,222,128,0.15)";
+    tog.style.borderColor = "rgba(74,222,128,0.35)";
+    tog.style.color = "#86efac";
+    content.style.whiteSpace = "normal";
+    jsRenderPracticeCards(jsPrepRawText);
+  } else {
+    tog.textContent = "Practice";
+    tog.style.background = "rgba(99,102,241,0.15)";
+    tog.style.borderColor = "rgba(99,102,241,0.35)";
+    tog.style.color = "#a5b4fc";
+    content.style.whiteSpace = "pre-wrap";
+    content.textContent = jsPrepRawText;
+  }
+}
+
+function jsRenderPracticeCards(text) {
+  if (!text || text === "Generating questions..." || text.startsWith("Add Gemini") || text.startsWith("Error:")) {
+    document.getElementById("js-prep-content").textContent = text || "";
+    return;
+  }
+  const lines = text.split("\n");
+  // Extract Q&A pairs: look for numbered questions or **Q lines
+  const pairs = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    const isQuestion = /^\d+[\.\)]\s+/.test(line) || /^\*\*Q\d*[\.\:]/.test(line) || /^\*\*\d+\./.test(line);
+    if (isQuestion) {
+      const qText = line.replace(/^\*\*/, "").replace(/\*\*$/, "").replace(/^\d+[\.\)]\s+/, "").replace(/^\*\*Q\d*[\.\:]\s*/, "").trim();
+      // collect model answer lines until next question or section header
+      let answerLines = [];
+      i++;
+      while (i < lines.length) {
+        const next = lines[i].trim();
+        if (/^\d+[\.\)]\s+/.test(next) || /^\*\*Q\d*[\.\:]/.test(next) || /^\*\*\d+\./.test(next) || /^##\s/.test(next)) break;
+        answerLines.push(lines[i]);
+        i++;
+      }
+      const modelAnswer = answerLines.join("\n").replace(/^\s+|\s+$/g, "");
+      if (qText) pairs.push({ q: qText, a: modelAnswer });
+    } else {
+      i++;
+    }
+  }
+
+  if (pairs.length === 0) {
+    // fallback: show read mode
+    document.getElementById("js-prep-content").style.whiteSpace = "pre-wrap";
+    document.getElementById("js-prep-content").textContent = text;
+    return;
+  }
+
+  const container = document.getElementById("js-prep-content");
+  container.innerHTML = "";
+  pairs.forEach((pair, idx) => {
+    const card = document.createElement("div");
+    card.style.cssText = "background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:14px;margin-bottom:12px;";
+    card.innerHTML = `
+      <div style="font-weight:700;font-size:.88rem;color:var(--color-text-primary);margin-bottom:10px;">${jsEscHtml(pair.q)}</div>
+      <textarea id="js-prac-ans-${idx}" placeholder="Type your answer here..." style="
+        width:100%;min-height:80px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
+        border-radius:6px;padding:8px;color:var(--color-text-secondary);font-size:.82rem;line-height:1.6;
+        resize:vertical;box-sizing:border-box;font-family:inherit;
+      "></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        <button onclick="jsRevealAnswer(${idx})" style="
+          background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+          color:var(--color-text-secondary);font-size:.75rem;padding:4px 10px;border-radius:5px;cursor:pointer;
+        ">Reveal Model Answer</button>
+        <button onclick="jsScorePracticeAnswer(${idx}, ${JSON.stringify(pair.q)}, ${JSON.stringify(pair.a)})" style="
+          background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);
+          color:#a5b4fc;font-size:.75rem;padding:4px 10px;border-radius:5px;cursor:pointer;
+        ">Score my answer</button>
+      </div>
+      <div id="js-prac-model-${idx}" style="display:none;margin-top:10px;padding:8px;background:rgba(255,255,255,0.04);border-radius:6px;font-size:.8rem;color:var(--color-text-muted);white-space:pre-wrap;line-height:1.6;"></div>
+      <div id="js-prac-score-${idx}" style="display:none;margin-top:8px;"></div>
+    `;
+    container.appendChild(card);
+    // store model answer on the hidden div
+    document.getElementById("js-prac-model-" + idx).textContent = pair.a;
+  });
+}
+
+function jsRevealAnswer(idx) {
+  const el = document.getElementById("js-prac-model-" + idx);
+  if (el) el.style.display = el.style.display === "none" ? "block" : "none";
+}
+
+async function jsScorePracticeAnswer(idx, question, modelAnswer) {
+  const ansEl = document.getElementById("js-prac-ans-" + idx);
+  const scoreEl = document.getElementById("js-prac-score-" + idx);
+  if (!ansEl || !scoreEl) return;
+  const candidateAnswer = ansEl.value.trim();
+  if (!candidateAnswer) { scoreEl.style.display="block"; scoreEl.innerHTML='<span style="color:#f87171;font-size:.78rem;">Please write your answer first.</span>'; return; }
+  if (!geminiApiKey) { scoreEl.style.display="block"; scoreEl.innerHTML='<span style="color:#f87171;font-size:.78rem;">No Gemini API key set.</span>'; return; }
+  scoreEl.style.display = "block";
+  scoreEl.innerHTML = '<span style="color:var(--color-text-muted);font-size:.78rem;">Scoring...</span>';
+  const prompt = `Score this interview answer 1-5 (5=excellent). Return JSON: {"score": N, "feedback": "one sentence"}. Question: ${question}. Model answer: ${modelAnswer}. Candidate answer: ${candidateAnswer}`;
+  try {
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiApiKey,
+      { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ contents:[{ parts:[{ text: prompt }] }] }) }
+    );
+    const data = await res.json();
+    let raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    // strip markdown code fences
+    raw = raw.replace(/```json\s*/gi,"").replace(/```\s*/g,"").trim();
+    const parsed = JSON.parse(raw);
+    const score = parseInt(parsed.score) || 0;
+    const feedback = parsed.feedback || "";
+    const color = score >= 5 ? "#4ade80" : score === 4 ? "#818cf8" : score === 3 ? "#facc15" : "#f87171";
+    scoreEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="background:${color};color:#000;font-weight:700;font-size:.8rem;padding:2px 10px;border-radius:20px;">${score}/5</span>
+      <span style="font-size:.78rem;color:var(--color-text-muted);">${jsEscHtml(feedback)}</span>
+    </div>`;
+  } catch(e) {
+    scoreEl.innerHTML = '<span style="color:#f87171;font-size:.78rem;">Score error: ' + jsEscHtml(e.message) + '</span>';
+  }
 }
 
 async function jsGeneratePrepQuestions(role, company) {
@@ -6645,6 +7047,7 @@ Candidate profile:
     );
     const data = await res.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response from Gemini.";
+    jsPrepRawText = text;
     document.getElementById("js-prep-content").textContent = text;
   } catch (e) {
     document.getElementById("js-prep-content").textContent = "Error: " + e.message;
@@ -6758,6 +7161,112 @@ If data is for Singapore/UAE, use SGD/AED. Be specific and data-driven.`;
   } catch (e) {
     el.textContent = "Error fetching salary data: " + e.message;
   }
+}
+</script>
+
+<script>
+function openOutreachForContact(contact) {
+  selectedContact = contact;
+  switchModule('referral-outreach');
+  showToast('Drafting outreach for ' + contact.name);
+}
+
+function renderNetworkGraph() {
+  const emptyEl = document.getElementById('network-empty');
+  const svgEl = document.getElementById('network-svg');
+  if (!svgEl) return;
+
+  const contacts = JSON.parse(localStorage.getItem('bookmarked_contacts') || '[]');
+  if (!contacts.length) {
+    if (emptyEl) { emptyEl.style.display = 'flex'; }
+    return;
+  }
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  // Clear previous render
+  d3.select('#network-svg').selectAll('*').remove();
+
+  const container = document.getElementById('network-graph-container');
+  const width = container.clientWidth || 800;
+  const height = container.clientHeight || 500;
+
+  // Build nodes and links
+  const companies = [...new Set(contacts.map(c => c.company).filter(Boolean))];
+  const hubNodes = companies.map(c => ({ id: 'hub_' + c, name: c, isHub: true }));
+  const contactNodes = contacts.map((c, i) => ({ id: 'c_' + i, name: c.name, role: c.role, company: c.company, contact: c, isHub: false }));
+  const nodes = [...hubNodes, ...contactNodes];
+  const links = contactNodes.map(c => ({ source: c.id, target: 'hub_' + c.company }));
+
+  const svg = d3.select('#network-svg')
+    .attr('width', width)
+    .attr('height', height);
+
+  // Glow filter
+  const defs = svg.append('defs');
+  const filter = defs.append('filter').attr('id', 'glow');
+  filter.append('feGaussianBlur').attr('stdDeviation', '3').attr('result', 'coloredBlur');
+  const feMerge = filter.append('feMerge');
+  feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+  feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+  const g = svg.append('g');
+  svg.call(d3.zoom().scaleExtent([0.3, 3]).on('zoom', e => g.attr('transform', e.transform)));
+
+  const simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(d => d.id).distance(90))
+    .force('charge', d3.forceManyBody().strength(-220))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('collision', d3.forceCollide(32));
+
+  const link = g.append('g').selectAll('line').data(links).join('line')
+    .attr('stroke', 'rgba(255,255,255,0.15)')
+    .attr('stroke-width', 1.5);
+
+  const node = g.append('g').selectAll('circle').data(nodes).join('circle')
+    .attr('r', d => d.isHub ? 22 : 13)
+    .attr('fill', d => d.isHub ? '#6366f1' : '#4ade80')
+    .attr('stroke', d => d.isHub ? '#818cf8' : '#86efac')
+    .attr('stroke-width', 1.5)
+    .attr('cursor', d => d.isHub ? 'default' : 'pointer')
+    .style('filter', 'url(#glow)')
+    .on('click', (e, d) => { if (!d.isHub) openOutreachForContact(d.contact); })
+    .on('mouseover', (e, d) => {
+      const tooltip = document.getElementById('network-tooltip');
+      if (!tooltip) return;
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 14) + 'px';
+      tooltip.style.top = (e.clientY - 10) + 'px';
+      tooltip.innerHTML = d.isHub
+        ? `<strong>${d.name}</strong>`
+        : `<strong>${d.name}</strong><br>${d.role || ''} at ${d.company || ''}<br><span style="color:var(--accent-indigo);font-size:.75rem;">Click to draft outreach</span>`;
+    })
+    .on('mousemove', (e) => {
+      const tooltip = document.getElementById('network-tooltip');
+      if (tooltip) { tooltip.style.left = (e.clientX + 14) + 'px'; tooltip.style.top = (e.clientY - 10) + 'px'; }
+    })
+    .on('mouseout', () => {
+      const tooltip = document.getElementById('network-tooltip');
+      if (tooltip) tooltip.style.display = 'none';
+    })
+    .call(d3.drag()
+      .on('start', (e, d) => { if (!e.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on('end', (e, d) => { if (!e.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; }));
+
+  const label = g.append('g').selectAll('text').data(nodes).join('text')
+    .text(d => d.name.length > 14 ? d.name.slice(0, 13) + '…' : d.name)
+    .attr('text-anchor', 'middle')
+    .attr('dy', d => (d.isHub ? 22 : 13) + 14)
+    .attr('fill', 'rgba(247,244,235,0.7)')
+    .attr('font-size', d => d.isHub ? '11px' : '10px')
+    .attr('pointer-events', 'none');
+
+  simulation.on('tick', () => {
+    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    node.attr('cx', d => d.x).attr('cy', d => d.y);
+    label.attr('x', d => d.x).attr('y', d => d.y);
+  });
 }
 </script>
 

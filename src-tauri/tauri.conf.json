@@ -1,6 +1,6 @@
 {
   "productName": "CareerOS",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "identifier": "com.careeros.app",
   "build": {
     "frontendDist": "../app"
