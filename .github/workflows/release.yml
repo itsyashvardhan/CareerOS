@@ -173,18 +173,17 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          # The secret is the full minisign file (header + base64 key).
-          # tauri signer sign --private-key flag base64-decodes the raw string and chokes
-          # on the "untrusted comment:" header (contains spaces).
-          # Strip the header so the env var contains only the base64 key line.
-          CLEAN_KEY=$(printf '%s\n' "$TAURI_SIGNING_PRIVATE_KEY" | grep -v '^untrusted comment' | tr -d '\r\n ')
+          # --private-key expects base64(full_minisign_file_content) including the
+          # "untrusted comment:" header — same format as the pubkey in tauri.conf.json.
+          # Our secret is raw file content, so base64-encode the whole thing first.
+          ENCODED_KEY=$(printf '%s\n' "$TAURI_SIGNING_PRIVATE_KEY" | base64 -w 0)
           cd dist
           for f in *.nsis.zip *.app.tar.gz *.AppImage.tar.gz; do
             [ -f "$f" ] || continue
             [ -f "${f}.sig" ] && { echo "  already signed: $f"; continue; }
             echo "  signing: $f"
-            TAURI_SIGNING_PRIVATE_KEY="$CLEAN_KEY" cargo tauri signer sign \
-              --private-key "$CLEAN_KEY" \
+            TAURI_SIGNING_PRIVATE_KEY="$ENCODED_KEY" cargo tauri signer sign \
+              --private-key "$ENCODED_KEY" \
               --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
               "$f"
           done
