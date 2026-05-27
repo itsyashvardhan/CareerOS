@@ -4295,31 +4295,91 @@ function showToast(message, isClaude = false) {
 }
 
 function showUpdateToast(version) {
-  const existing = document.getElementById("update-toast");
+  const existing = document.getElementById("update-modal-backdrop");
   if (existing) existing.remove();
-  const el = document.createElement("div");
-  el.id = "update-toast";
-  el.style.cssText = `
-    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
-    background:rgba(30,28,25,0.97); border:1px solid rgba(204,104,73,0.6);
-    border-radius:12px; padding:14px 20px; display:flex; align-items:center; gap:14px;
-    font-size:.85rem; color:var(--color-text-primary); z-index:9999;
-    box-shadow:0 8px 32px rgba(0,0,0,0.5); max-width:420px;
+
+  const backdrop = document.createElement("div");
+  backdrop.id = "update-modal-backdrop";
+  backdrop.style.cssText = `
+    position:fixed; inset:0; background:rgba(0,0,0,0.72); backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px); z-index:99999; display:flex;
+    align-items:center; justify-content:center;
   `;
-  el.innerHTML = `
-    <span>🚀 <strong>CareerOS ${version}</strong> is available</span>
-    <button onclick="doInstallUpdate()" style="padding:6px 14px; border-radius:8px; background:var(--accent-indigo); color:#fff; border:none; font-size:.82rem; cursor:pointer; white-space:nowrap;">Update & Restart</button>
-    <button onclick="this.parentElement.remove()" style="background:none; border:none; color:var(--color-text-muted); cursor:pointer; font-size:1rem; line-height:1; padding:0 4px;">✕</button>
+
+  backdrop.innerHTML = `
+    <div id="update-modal" style="
+      background:#111009; border:1px solid rgba(204,104,73,0.4);
+      border-radius:20px; padding:2rem; width:92%; max-width:420px;
+      box-shadow:0 24px 60px rgba(0,0,0,0.8), 0 0 40px rgba(204,104,73,0.08);
+      display:flex; flex-direction:column; gap:1.25rem;
+    ">
+      <div style="display:flex; align-items:flex-start; gap:14px;">
+        <div style="
+          width:42px; height:42px; border-radius:10px; flex-shrink:0;
+          background:rgba(204,104,73,0.15); border:1px solid rgba(204,104,73,0.3);
+          display:flex; align-items:center; justify-content:center; font-size:1.3rem;
+        ">🚀</div>
+        <div>
+          <div style="font-family:var(--font-heading); font-weight:700; font-size:1.05rem; color:var(--color-text-primary); margin-bottom:4px;">
+            CareerOS ${version} is ready
+          </div>
+          <div style="font-size:0.8rem; color:var(--color-text-secondary); line-height:1.5;">
+            A new version has been downloaded and is ready to install. The app will restart automatically after the update.
+          </div>
+        </div>
+      </div>
+
+      <div id="update-progress-area" style="display:none; background:rgba(0,0,0,0.3); border-radius:10px; padding:12px 14px;">
+        <div style="font-size:0.78rem; color:var(--color-text-secondary); margin-bottom:8px;" id="update-progress-label">Preparing update…</div>
+        <div style="height:4px; background:rgba(255,255,255,0.07); border-radius:4px; overflow:hidden;">
+          <div id="update-progress-bar" style="height:100%; width:0%; background:var(--accent-indigo); border-radius:4px; transition:width 0.3s ease;"></div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <button id="update-btn-install" onclick="doInstallUpdate()" style="
+          flex:1; padding:11px 0; border-radius:10px; background:var(--accent-indigo);
+          color:#fff; border:none; font-size:0.875rem; font-weight:700;
+          cursor:pointer; font-family:var(--font-sans); transition:all 0.2s;
+        ">Update & Restart</button>
+        <button onclick="document.getElementById('update-modal-backdrop').remove()" style="
+          padding:11px 18px; border-radius:10px; background:rgba(255,255,255,0.04);
+          border:1px solid rgba(255,255,255,0.08); color:var(--color-text-secondary);
+          font-size:0.875rem; font-weight:600; cursor:pointer; font-family:var(--font-sans);
+          white-space:nowrap; transition:all 0.2s;
+        ">Later</button>
+      </div>
+    </div>
   `;
-  document.body.appendChild(el);
+
+  document.body.appendChild(backdrop);
 }
 
 async function doInstallUpdate() {
-  const btn = document.querySelector("#update-toast button");
-  if (btn) { btn.textContent = "Installing…"; btn.disabled = true; }
+  const btn = document.getElementById("update-btn-install");
+  const progressArea = document.getElementById("update-progress-area");
+  const progressBar = document.getElementById("update-progress-bar");
+  const progressLabel = document.getElementById("update-progress-label");
+
+  if (btn) { btn.textContent = "Installing…"; btn.disabled = true; btn.style.opacity = "0.6"; }
+  if (progressArea) progressArea.style.display = "block";
+
+  let pct = 0;
+  const ticker = setInterval(() => {
+    pct = Math.min(pct + Math.random() * 12, 88);
+    if (progressBar) progressBar.style.width = pct + "%";
+    if (progressLabel) progressLabel.textContent = pct < 40 ? "Downloading update…" : pct < 80 ? "Verifying signature…" : "Applying update…";
+  }, 400);
+
   try {
     await window.__TAURI__.core.invoke("install_update");
+    clearInterval(ticker);
+    if (progressBar) progressBar.style.width = "100%";
+    if (progressLabel) progressLabel.textContent = "Restarting…";
   } catch (e) {
+    clearInterval(ticker);
+    const modal = document.getElementById("update-modal-backdrop");
+    if (modal) modal.remove();
     showToast("Update failed: " + e);
   }
 }
