@@ -2387,6 +2387,13 @@
                 Open in Claude
               </button>
             </div>
+            <div style="margin-top:10px;">
+              <button class="btn btn-glow-emerald" onclick="generateFollowUpSequence()" id="btn-followup-seq" style="width:100%; font-size:.8rem;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                Generate Day 5 + Day 14 Follow-ups
+              </button>
+              <div id="followup-seq-output" style="display:none; margin-top:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:10px; padding:14px;"></div>
+            </div>
           </div>
 
         </div>
@@ -4798,6 +4805,99 @@ function copyMail() {
   });
 }
 
+async function generateFollowUpSequence() {
+  if (!generatedMail) { showToast("Generate the initial outreach message first."); return; }
+  if (!geminiApiKey) { alert("Add Gemini API key in Settings."); openSettings(); return; }
+  const btn = document.getElementById("btn-followup-seq");
+  btn.textContent = "Writing follow-ups..."; btn.disabled = true;
+  const out = document.getElementById("followup-seq-output");
+  out.style.display = "none";
+
+  const contactName = selectedContact?.name || "the contact";
+  const company = selectedContact?.company || "their company";
+  const title = document.getElementById("role-title").value.trim() || "the role";
+  const p = getUserProfile();
+  const sender = p.name || "the candidate";
+
+  const prompt = `The candidate "${sender}" sent this initial outreach message to ${contactName} at ${company} for ${title}:
+
+---
+${generatedMail}
+---
+
+Write two follow-up messages:
+
+**Day 5 Follow-up** (if no reply after 5 days):
+- Under 60 words. Reference the initial message briefly. Add one new value point or a recent company news hook. Clear CTA.
+
+**Day 14 Follow-up** (final nudge, 14 days after initial):
+- Under 50 words. Graceful, no desperation. Leave door open. Professional close.
+
+Format:
+## Day 5 Follow-up
+[message]
+
+## Day 14 Follow-up
+[message]`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) }
+    );
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response.";
+
+    // Parse Day 5 and Day 14
+    const day5Match = text.match(/## Day 5 Follow-up\s*([\s\S]*?)(?=## Day 14|$)/i);
+    const day14Match = text.match(/## Day 14 Follow-up\s*([\s\S]*?)$/i);
+    const day5 = day5Match ? day5Match[1].trim() : "";
+    const day14 = day14Match ? day14Match[1].trim() : "";
+
+    out.innerHTML = `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:.75rem; font-weight:600; color:var(--accent-indigo); margin-bottom:6px; text-transform:uppercase; letter-spacing:.05em;">Day 5 Follow-up</div>
+        <div style="font-size:.83rem; color:var(--color-text-secondary); white-space:pre-wrap; line-height:1.65;">${jsEscHtml(day5)}</div>
+        <button onclick="navigator.clipboard.writeText(${JSON.stringify(day5).replace(/</g,'\\u003c')})" style="margin-top:6px; padding:4px 10px; font-size:.72rem; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:var(--color-text-muted); cursor:pointer;">Copy</button>
+      </div>
+      <div>
+        <div style="font-size:.75rem; font-weight:600; color:var(--accent-emerald); margin-bottom:6px; text-transform:uppercase; letter-spacing:.05em;">Day 14 Follow-up</div>
+        <div style="font-size:.83rem; color:var(--color-text-secondary); white-space:pre-wrap; line-height:1.65;">${jsEscHtml(day14)}</div>
+        <button onclick="navigator.clipboard.writeText(${JSON.stringify(day14).replace(/</g,'\\u003c')})" style="margin-top:6px; padding:4px 10px; font-size:.72rem; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:var(--color-text-muted); cursor:pointer;">Copy</button>
+      </div>
+      <div style="margin-top:12px; border-top:1px solid rgba(255,255,255,0.05); padding-top:10px;">
+        <button onclick="saveFollowUpSeqToTracker(${JSON.stringify(day5).replace(/</g,'\\u003c')}, ${JSON.stringify(day14).replace(/</g,'\\u003c')})" style="padding:6px 14px; font-size:.78rem; border-radius:8px; border:1px solid rgba(99,102,241,0.3); background:rgba(99,102,241,0.08); color:var(--accent-indigo); cursor:pointer;">Save all 3 messages to Tracker</button>
+      </div>`;
+    out.style.display = "block";
+    showToast("Follow-up sequence generated!");
+  } catch (e) {
+    out.innerHTML = `<div style="color:#f87171; font-size:.82rem;">Error: ${jsEscHtml(e.message)}</div>`;
+    out.style.display = "block";
+  } finally {
+    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg> Generate Day 5 + Day 14 Follow-ups`;
+    btn.disabled = false;
+  }
+}
+
+function saveFollowUpSeqToTracker(day5, day14) {
+  if (!selectedContact) { showToast("No contact selected."); return; }
+  const apps = JSON.parse(localStorage.getItem("applications_tracker") || "[]");
+  const role = document.getElementById("role-title").value.trim() || selectedContact.role || "Outreach";
+  const company = selectedContact.company;
+  const today = new Date();
+  const followUpDate = new Date(today); followUpDate.setDate(today.getDate() + 5);
+  const note = `Initial message sent.\n\nDay 5 follow-up:\n${day5}\n\nDay 14 follow-up:\n${day14}`;
+  apps.push({
+    role, company, status: "Applied",
+    date: today.toISOString().split("T")[0],
+    follow_up_date: followUpDate.toISOString().split("T")[0],
+    notes: note
+  });
+  localStorage.setItem("applications_tracker", JSON.stringify(apps));
+  showToast("Saved to Tracker with follow-up on Day 5!");
+}
+
 // Action: Send outreach generation prompt to Claude
 function outreachToClaude() {
   const goal = document.getElementById("outreach-goal").value;
@@ -4894,6 +4994,9 @@ function renderTracker() {
         ${app.status === 'Interview' || app.status === 'Offer'
           ? `<button class="action-icon-btn" onclick="jsOpenPrepPanel('${jsEscHtml(app.role.replace(/'/g,"\\'"))}','${jsEscHtml(app.company.replace(/'/g,"\\'"))}')" title="Interview Prep" style="color:var(--accent-indigo);">
                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+             </button>
+             <button class="action-icon-btn" onclick="jsOpenSalaryPanel('${jsEscHtml(app.role.replace(/'/g,"\\'"))}','${jsEscHtml(app.company.replace(/'/g,"\\'"))}')" title="Salary Intel" style="color:#4ade80;">
+               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
              </button>`
           : ''}
         <button class="action-icon-btn" onclick="generateFollowUp(${idx})" title="Draft follow-up email" style="color:var(--color-text-muted);">
@@ -6183,6 +6286,7 @@ function jsScannerRender() {
                onmouseout="this.style.color='var(--color-text-secondary)'">${jsEscHtml(j.company)}</div>
           ${j.location ? `<div style="color:var(--color-text-muted); font-size:.75rem; margin-top:2px;">${jsEscHtml(j.location)}</div>` : ""}
           <div class="js-score-badge" id="score-${idx}" style="font-size:11px; color:var(--color-text-muted); margin-top:4px;">scoring…</div>
+          <div id="skills-${idx}" style="margin-top:3px; display:flex; flex-wrap:wrap; gap:4px;"></div>
         </div>
         <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end; margin-top:2px;">
           ${j.url ? `<a href="${jsEscHtml(j.url)}" target="_blank" rel="noopener"
@@ -6221,7 +6325,7 @@ async function jsScoreVisibleJobs(jobs) {
   // Apply cached scores immediately
   jobs.forEach((j, idx) => {
     const cached = jsScoreCache.get(`${j.title}|${j.company}`);
-    if (cached) jsScoreApplyBadge(idx, cached.score, cached.reason);
+    if (cached) jsScoreApplyBadge(idx, cached.score, cached.reason, cached.missing_skills || []);
   });
 
   if (!unscored.length) return;
@@ -6236,7 +6340,8 @@ async function jsScoreVisibleJobs(jobs) {
 
 async function jsScoreOneJob(j, idx) {
   const cacheKey = `${j.title}|${j.company}`;
-  const prompt = `Rate the fit between this candidate and job. Return ONLY a JSON object: {"score": <0-100>, "reason": "<one sentence>"}
+  const prompt = `Rate the fit between this candidate and job. Return ONLY a JSON object: {"score": <0-100>, "reason": "<one sentence>", "missing_skills": ["skill1", "skill2"]}
+missing_skills: up to 4 specific skills/tools the candidate lacks for this role. Empty array if strong match.
 
 Candidate profile:
 ${buildProfileContext()}
@@ -6263,8 +6368,9 @@ Job: ${j.title} at ${j.company} (${j.location || 'remote'})`;
       parsed = m ? JSON.parse(m[0]) : null;
     }
     if (parsed && typeof parsed.score === "number") {
-      jsScoreCache.set(cacheKey, { score: parsed.score, reason: parsed.reason || "" });
-      jsScoreApplyBadge(idx, parsed.score, parsed.reason || "");
+      const missing = Array.isArray(parsed.missing_skills) ? parsed.missing_skills.slice(0, 4) : [];
+      jsScoreCache.set(cacheKey, { score: parsed.score, reason: parsed.reason || "", missing_skills: missing });
+      jsScoreApplyBadge(idx, parsed.score, parsed.reason || "", missing);
     } else {
       throw new Error("bad parse");
     }
@@ -6274,7 +6380,7 @@ Job: ${j.title} at ${j.company} (${j.location || 'remote'})`;
   }
 }
 
-function jsScoreApplyBadge(idx, score, reason) {
+function jsScoreApplyBadge(idx, score, reason, missing) {
   const el = document.getElementById(`score-${idx}`);
   if (!el) return;
   let color, label;
@@ -6285,6 +6391,13 @@ function jsScoreApplyBadge(idx, score, reason) {
   const reasonTxt = reason ? ` · ${reason}` : "";
   el.style.color = color;
   el.textContent = `${score} · ${label}${reasonTxt}`;
+
+  const skillsEl = document.getElementById(`skills-${idx}`);
+  if (skillsEl && missing && missing.length) {
+    skillsEl.innerHTML = missing.map(s =>
+      `<span style="background:rgba(248,113,113,0.12); border:1px solid rgba(248,113,113,0.25); color:#f87171; font-size:10px; padding:2px 7px; border-radius:4px; white-space:nowrap;">${jsEscHtml(s)}</span>`
+    ).join("");
+  }
 }
 
 function jsScannerExportCSV() {
@@ -6551,6 +6664,102 @@ Candidate profile:
   </div>
   <div id="js-intel-content" style="font-size:.84rem; line-height:1.75; color:var(--color-text-secondary); white-space:pre-wrap;"></div>
 </div>
+
+<div id="js-salary-panel" style="
+  position: fixed; right: 0; top: 0; height: 100vh; width: 440px;
+  background: rgba(24,23,21,0.98); border-left: 1px solid rgba(247,244,235,0.08);
+  z-index: 1001; padding: 28px; overflow-y: auto;
+  transform: translateX(100%); transition: transform .3s ease;
+  backdrop-filter: blur(20px);
+">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <div style="font-weight:700; font-size:1rem;" id="js-salary-title">Salary Intel</div>
+    <button onclick="jsCloseSalaryPanel()" style="background:none;border:none;color:var(--color-text-muted);font-size:1.2rem;cursor:pointer;">&#x2715;</button>
+  </div>
+  <div id="js-salary-content" style="font-size:.85rem; line-height:1.75; color:var(--color-text-secondary); white-space:pre-wrap;"></div>
+</div>
+
+<script>
+const jsSalaryCache = new Map();
+
+function jsOpenSalaryPanel(role, company) {
+  document.getElementById("js-salary-title").textContent = "Salary Intel — " + role;
+  document.getElementById("js-salary-panel").style.transform = "translateX(0)";
+  jsLoadSalaryIntel(role, company);
+}
+
+function jsCloseSalaryPanel() {
+  document.getElementById("js-salary-panel").style.transform = "translateX(100%)";
+}
+
+async function jsLoadSalaryIntel(role, company) {
+  const cacheKey = role + "|" + (getUserProfile().location || "India");
+  if (jsSalaryCache.has(cacheKey)) {
+    document.getElementById("js-salary-content").innerHTML = jsSalaryCache.get(cacheKey);
+    return;
+  }
+  const el = document.getElementById("js-salary-content");
+  el.textContent = "Researching salary benchmarks...";
+
+  const tavilyKey = localStorage.getItem("tavily_key");
+  const gemKey = geminiApiKey;
+  if (!tavilyKey || !gemKey) {
+    el.textContent = "Add Tavily and Gemini API keys in Settings to use Salary Intel.";
+    return;
+  }
+
+  const profile = getUserProfile();
+  const market = profile.target_markets?.length ? profile.target_markets[0] : (profile.location || "India");
+  const query = role + " salary " + market + " 2025 entry level";
+
+  try {
+    const tvRes = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: tavilyKey, query, max_results: 5, search_depth: "basic" })
+    });
+    const tvData = await tvRes.json();
+    const snippets = (tvData.results || []).map(r => r.content || r.snippet || "").join("\n\n").slice(0, 2000);
+
+    const prompt = `Based on these search results, provide salary benchmarks for "${role}" in ${market} for freshers/entry-level (0-2 years experience).
+
+Search data:
+${snippets}
+
+Return a concise report with exactly this format:
+**p25 (entry):** ₹X – ₹Y LPA
+**Median:** ₹X – ₹Y LPA
+**p75 (experienced):** ₹X – ₹Y LPA
+
+**Key factors:**
+- 2-3 bullet points on what drives salary in this role/market
+
+**Negotiation tips:**
+- 2-3 specific tips for a fresher negotiating this role
+
+If data is for Singapore/UAE, use SGD/AED. Be specific and data-driven.`;
+
+    const gemRes = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + gemKey,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      }
+    );
+    const gemData = await gemRes.json();
+    const text = gemData.candidates?.[0]?.content?.parts?.[0]?.text || "No response from Gemini.";
+    const html = text
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/^- (.+)$/gm, "• $1")
+      .replace(/\n/g, "<br>");
+    jsSalaryCache.set(cacheKey, html);
+    el.innerHTML = html;
+  } catch (e) {
+    el.textContent = "Error fetching salary data: " + e.message;
+  }
+}
+</script>
 
 </body>
 </html>
