@@ -4686,6 +4686,11 @@ function renderTracker() {
       <td>${followUpDisplay}</td>
       <td>${noteDisplay}</td>
       <td style="text-align: center;">
+        ${app.status === 'Interview' || app.status === 'Offer'
+          ? `<button class="action-icon-btn" onclick="jsOpenPrepPanel('${jsEscHtml(app.role.replace(/'/g,"\\'"))}','${jsEscHtml(app.company.replace(/'/g,"\\'"))}')" title="Interview Prep" style="color:var(--accent-indigo);">
+               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+             </button>`
+          : ''}
         <button class="action-icon-btn" onclick="deleteTrackerRow(${idx})" title="Delete Application">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/></svg>
         </button>
@@ -5485,6 +5490,7 @@ const JS_MANUAL_SEARCHES = [
 let jsAllJobs = [];
 let jsActiveSourceFilters = new Set();
 let jsSavedJobs = JSON.parse(localStorage.getItem("js_saved_jobs") || "[]");
+const jsScoreCache = new Map(); // key: "title|company" → {score, reason}
 
 function jsToggleSave(key, title, company, url) {
   const idx = jsSavedJobs.findIndex(j => j.key === key);
@@ -5912,7 +5918,8 @@ function jsScannerRender() {
     return;
   }
 
-  container.innerHTML = jobs.map(j => {
+  const renderedJobs = jobs; // keep reference for scoring
+  container.innerHTML = renderedJobs.map((j, idx) => {
     const key = `${j.title}|${j.company}|${j.url}`;
     const saved = jsSavedJobs.some(s => s.key === key);
     const saveLabel = saved ? "Saved ✓" : "Save";
@@ -5929,8 +5936,12 @@ function jsScannerRender() {
             ${j.posted_at ? `<span style="font-size:11px;color:var(--color-text-muted);">${j.posted_at}</span>` : ""}
           </div>
           <div style="font-weight:600; color:var(--color-text-primary); font-size:.88rem; line-height:1.3;">${jsEscHtml(j.title)}</div>
-          <div style="color:var(--color-text-secondary); font-size:.78rem; margin-top:3px;">${jsEscHtml(j.company)}</div>
+          <div style="color:var(--color-text-secondary); font-size:.78rem; margin-top:3px; cursor:pointer; text-decoration:underline; text-decoration-color:rgba(247,244,235,0.2);"
+               onclick="jsOpenIntelPanel('${jsEscHtml(j.company.replace(/'/g,"\\'"))}')"
+               onmouseover="this.style.color='var(--accent-indigo)'"
+               onmouseout="this.style.color='var(--color-text-secondary)'">${jsEscHtml(j.company)}</div>
           ${j.location ? `<div style="color:var(--color-text-muted); font-size:.75rem; margin-top:2px;">${jsEscHtml(j.location)}</div>` : ""}
+          <div class="js-score-badge" id="score-${idx}" style="font-size:11px; color:var(--color-text-muted); margin-top:4px;">scoring…</div>
         </div>
         <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end; margin-top:2px;">
           ${j.url ? `<a href="${jsEscHtml(j.url)}" target="_blank" rel="noopener"
@@ -5949,6 +5960,91 @@ function jsScannerRender() {
       </div>
     </div>`;
   }).join("");
+
+  // Fire-and-forget AI scoring (only if key + CV are available)
+  const cvText = localStorage.getItem("draft_cv_text") || "";
+  if (geminiApiKey && cvText) {
+    jsScoreVisibleJobs(renderedJobs, cvText);
+  } else {
+    // No CV or key — clear "scoring…" placeholders
+    renderedJobs.forEach((_, idx) => {
+      const el = document.getElementById(`score-${idx}`);
+      if (el) el.textContent = "";
+    });
+  }
+}
+
+async function jsScoreVisibleJobs(jobs, cvText) {
+  const unscored = jobs.map((j, idx) => ({ j, idx }))
+    .filter(({ j }) => !jsScoreCache.has(`${j.title}|${j.company}`));
+
+  // Apply cached scores immediately
+  jobs.forEach((j, idx) => {
+    const cached = jsScoreCache.get(`${j.title}|${j.company}`);
+    if (cached) jsScoreApplyBadge(idx, cached.score, cached.reason);
+  });
+
+  if (!unscored.length) return;
+
+  const BATCH = 5;
+  for (let i = 0; i < unscored.length; i += BATCH) {
+    const batch = unscored.slice(i, i + BATCH);
+    await Promise.all(batch.map(({ j, idx }) => jsScoreOneJob(j, idx, cvText)));
+    if (i + BATCH < unscored.length) await new Promise(r => setTimeout(r, 200));
+  }
+}
+
+async function jsScoreOneJob(j, idx, cvText) {
+  const cacheKey = `${j.title}|${j.company}`;
+  const prompt = `Rate the fit between this CV and job. Return ONLY a JSON object: {"score": <0-100>, "reason": "<one sentence>"}
+
+CV (truncated to 800 chars):
+${cvText.slice(0, 800)}
+
+Job: ${j.title} at ${j.company} (${j.location || 'remote'})`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      }
+    );
+    const data = await res.json();
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    // Strip markdown code fences if present
+    const cleaned = raw.replace(/```json?/gi, "").replace(/```/g, "").trim();
+    let parsed;
+    try { parsed = JSON.parse(cleaned); } catch (_) {
+      // Try extracting JSON object from response
+      const m = cleaned.match(/\{[\s\S]*?\}/);
+      parsed = m ? JSON.parse(m[0]) : null;
+    }
+    if (parsed && typeof parsed.score === "number") {
+      jsScoreCache.set(cacheKey, { score: parsed.score, reason: parsed.reason || "" });
+      jsScoreApplyBadge(idx, parsed.score, parsed.reason || "");
+    } else {
+      throw new Error("bad parse");
+    }
+  } catch (_) {
+    const el = document.getElementById(`score-${idx}`);
+    if (el) el.textContent = "—";
+  }
+}
+
+function jsScoreApplyBadge(idx, score, reason) {
+  const el = document.getElementById(`score-${idx}`);
+  if (!el) return;
+  let color, label;
+  if (score >= 80) { color = "#4ade80"; label = "Strong match"; }
+  else if (score >= 60) { color = "#fbbf24"; label = "Good match"; }
+  else if (score >= 40) { color = "var(--color-text-muted)"; label = "Partial match"; }
+  else { color = "#f87171"; label = "Weak match"; }
+  const reasonTxt = reason ? ` · ${reason}` : "";
+  el.style.color = color;
+  el.textContent = `${score} · ${label}${reasonTxt}`;
 }
 
 function jsScannerExportCSV() {
