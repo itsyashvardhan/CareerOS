@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -6185,5 +6185,57 @@ function jsUseForCV(j) {
   <div id="js-followup-content" style="font-size:.84rem; line-height:1.75; color:var(--color-text-secondary); white-space:pre-wrap;"></div>
 </div>
 
+
+<div id="js-prep-panel" style="
+  position: fixed; right: 0; top: 0; height: 100vh; width: 480px;
+  background: rgba(24,23,21,0.98); border-left: 1px solid rgba(247,244,235,0.08);
+  z-index: 1000; padding: 28px; overflow-y: auto;
+  transform: translateX(100%); transition: transform .3s ease;
+  backdrop-filter: blur(20px);
+">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <div style="font-weight:700; font-size:1rem;" id="js-prep-title">Interview Prep</div>
+    <button onclick="jsClosePrepPanel()" style="background:none;border:none;color:var(--color-text-muted);font-size:1.2rem;cursor:pointer;">&#x2715;</button>
+  </div>
+  <div id="js-prep-content" style="font-size:.85rem; line-height:1.7; color:var(--color-text-secondary); white-space:pre-wrap;"></div>
+</div>
+
+<script>
+function jsOpenPrepPanel(role, company) {
+  document.getElementById("js-prep-title").textContent = "Interview Prep - " + role + " @ " + company;
+  document.getElementById("js-prep-content").textContent = "Generating questions...";
+  document.getElementById("js-prep-panel").style.transform = "translateX(0)";
+  jsGeneratePrepQuestions(role, company);
+}
+
+function jsClosePrepPanel() {
+  document.getElementById("js-prep-panel").style.transform = "translateX(100%)";
+}
+
+async function jsGeneratePrepQuestions(role, company) {
+  if (!geminiApiKey) {
+    document.getElementById("js-prep-content").textContent = "Add Gemini API key in Settings to use Interview Prep.";
+    return;
+  }
+  const cv = localStorage.getItem("draft_cv_text") || "";
+  const prompt = "You are a senior interviewer at " + company + ". Generate interview prep for a candidate applying for: " + role + ".\n\nCV summary (first 600 chars): " + cv.slice(0, 600) + "\n\nProduce exactly this structure:\n## Likely Questions (8-10)\nFor each: the question, then a concise model answer tailored to this CV and role.\n\n## Red Flags to Address\n2-3 likely weaknesses based on the CV vs role, with how to frame them positively.\n\n## Questions to Ask Them\n3 smart questions the candidate should ask the interviewer.\n\nBe specific to " + company + "'s product/market if known. Be direct, no filler.";
+
+  try {
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + geminiApiKey,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      }
+    );
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response from Gemini.";
+    document.getElementById("js-prep-content").textContent = text;
+  } catch (e) {
+    document.getElementById("js-prep-content").textContent = "Error: " + e.message;
+  }
+}
+</script>
 </body>
 </html>
