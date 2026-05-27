@@ -37,5 +37,5 @@ _Last updated: 2026-05-27. Reflects post-v1.0.4 state._
 **How**: Detect Greenhouse/Lever/Ashby form fields, fill from `user_profile`. Generate cover letter via Gemini inline. Requires Tauri `inject_js` or Chrome extension manifest — architecturally complex.
 
 ### 2. Live Job Stream (WebSocket polling)
-**Why**: Jobs die in 72h. The current scan is manual. A live stream sorted by match score would be transformative.
+**Why**: Jobs die in 48h. The current scan is manual. A live stream sorted by match score would be transformative.
 **How**: Background Tauri task polling Greenhouse/Ashby APIs every 30 min. Emit new jobs to frontend. Show live counter in sidebar tab badge. Requires Rust changes.

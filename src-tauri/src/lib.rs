@@ -1,4 +1,4 @@
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
 
 #[tauri::command]
@@ -26,6 +26,10 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![install_update])
         .setup(|app| {
+            if let Some(win) = app.get_webview_window("main") {
+                win.show().unwrap_or_default();
+                win.set_focus().unwrap_or_default();
+            }
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 match check_for_update(&handle).await {

@@ -1,0 +1,8 @@
+# VS Code
+/.vscode/
+*.code-workspace
+
+# Build artifacts
+*/target/
+
+.claude
