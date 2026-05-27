@@ -2027,7 +2027,15 @@
     <div class="sidebar-header">
       <h2 class="sidebar-logo">CareerOS</h2>
     </div>
-    
+    <div id="user-identity-block" style="
+      padding: 10px 16px 14px;
+      border-bottom: 1px solid rgba(247,244,235,0.05);
+      margin-bottom: 4px;
+    ">
+      <div id="user-greeting" style="font-size:.78rem; color:var(--color-text-muted); line-height:1.4;">
+      </div>
+    </div>
+
     <nav class="sidebar-nav">
       <button id="sidemenu-prompt-engine" class="sidebar-link active" onclick="switchModule('prompt-engine')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
@@ -2158,6 +2166,12 @@
         <!-- Content Inputs Panel -->
         <div class="panel">
           <div class="panel-title">2. Input Profile Materials</div>
+          <div id="cv-profile-chip" style="
+            font-size:.72rem; color:var(--color-text-muted);
+            padding:6px 10px; background:rgba(204,104,73,0.07);
+            border-radius:8px; margin-bottom:12px; border:1px solid rgba(204,104,73,0.15);
+            display:none;
+          "></div>
 
           <!-- Role picker -->
           <div class="form-group">
@@ -3453,6 +3467,12 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
+    renderUserIdentity();
+    const _fp = JSON.parse(localStorage.getItem("user_profile") || "{}");
+    if (!_fp.name && !localStorage.getItem("profile_prompt_dismissed")) {
+      setTimeout(() => { showUpdateToast_profile(); }, 2500);
+    }
+
     startOctopusEngine();
     setTimeout(() => octoShowBubble("> ready.\n> let's get you hired.", 3500), 200);
 
@@ -3569,6 +3589,48 @@ function saveProfile() {
   };
   localStorage.setItem("user_profile", JSON.stringify(profile));
   showToast("Profile saved ✓");
+  renderUserIdentity();
+}
+
+function renderUserIdentity() {
+  const p = JSON.parse(localStorage.getItem("user_profile") || "{}");
+  const el = document.getElementById("user-greeting");
+  if (!el) return;
+  if (p.name) {
+    el.innerHTML = `<span style="color:var(--color-text-primary);font-weight:600;">${p.name}</span><br>
+      <span style="font-size:.72rem;">${p.location || ""}</span>`;
+  } else {
+    el.innerHTML = `<span style="color:var(--accent-indigo); cursor:pointer; font-size:.75rem;" onclick="openSettings()">
+      + Set up your profile →</span>`;
+  }
+  const chip = document.getElementById("cv-profile-chip");
+  if (chip && p.name) {
+    chip.style.display = "block";
+    chip.textContent = `${p.name} · ${p.target_roles || "all roles"} · ${p.experience || "fresher"}`;
+  }
+}
+
+function showUpdateToast_profile() {
+  const existing = document.getElementById("profile-onboard-toast");
+  if (existing) existing.remove();
+  const el = document.createElement("div");
+  el.id = "profile-onboard-toast";
+  el.style.cssText = `
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:rgba(30,28,25,0.97); border:1px solid rgba(204,104,73,0.4);
+    border-radius:12px; padding:14px 20px; display:flex; align-items:center; gap:14px;
+    font-size:.85rem; color:var(--color-text-primary); z-index:9990;
+    box-shadow:0 8px 32px rgba(0,0,0,0.5); max-width:440px;
+  `;
+  el.innerHTML = `
+    <span>👤 Set up your profile to personalize all AI features</span>
+    <button onclick="openSettings(); this.closest('#profile-onboard-toast').remove();"
+      style="padding:6px 14px; border-radius:8px; background:var(--accent-indigo); color:#fff; border:none; font-size:.82rem; cursor:pointer; white-space:nowrap;">Set Up</button>
+    <button onclick="localStorage.setItem('profile_prompt_dismissed','1'); this.closest('#profile-onboard-toast').remove();"
+      style="background:none; border:none; color:var(--color-text-muted); cursor:pointer; font-size:1rem; padding:0 4px;">✕</button>
+  `;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 12000);
 }
 
 function loadProfile() {
@@ -6150,7 +6212,7 @@ function jsScannerRender() {
   }
 }
 
-async function jsScoreVisibleJobs(jobs, cvText) {
+async function jsScoreVisibleJobs(jobs) {
   const unscored = jobs.map((j, idx) => ({ j, idx }))
     .filter(({ j }) => !jsScoreCache.has(`${j.title}|${j.company}`));
 
@@ -6165,17 +6227,17 @@ async function jsScoreVisibleJobs(jobs, cvText) {
   const BATCH = 5;
   for (let i = 0; i < unscored.length; i += BATCH) {
     const batch = unscored.slice(i, i + BATCH);
-    await Promise.all(batch.map(({ j, idx }) => jsScoreOneJob(j, idx, cvText)));
+    await Promise.all(batch.map(({ j, idx }) => jsScoreOneJob(j, idx)));
     if (i + BATCH < unscored.length) await new Promise(r => setTimeout(r, 200));
   }
 }
 
-async function jsScoreOneJob(j, idx, cvText) {
+async function jsScoreOneJob(j, idx) {
   const cacheKey = `${j.title}|${j.company}`;
-  const prompt = `Rate the fit between this CV and job. Return ONLY a JSON object: {"score": <0-100>, "reason": "<one sentence>"}
+  const prompt = `Rate the fit between this candidate and job. Return ONLY a JSON object: {"score": <0-100>, "reason": "<one sentence>"}
 
-CV (truncated to 800 chars):
-${cvText.slice(0, 800)}
+Candidate profile:
+${buildProfileContext()}
 
 Job: ${j.title} at ${j.company} (${j.location || 'remote'})`;
 
