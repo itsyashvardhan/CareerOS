@@ -2728,34 +2728,108 @@
 <!-- Settings Modal Panel -->
 <div id="settings-backdrop" class="modal-backdrop" onclick="closeSettings()"></div>
 <div id="settings-panel" class="settings-panel">
-  <div class="panel-title" style="border: none; margin-bottom: 1rem;">
-    <span>API Credentials Configuration</span>
+  <div class="panel-title" style="border: none; margin-bottom: 0.75rem;">
+    <span>Settings</span>
     <button class="link-action" onclick="closeSettings()" style="text-decoration: none; font-size: 1.1rem;">✕</button>
   </div>
-  
-  <div class="form-group">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-      <label class="form-label" for="settings-gemini" style="margin-bottom: 0;">Gemini API Key</label>
-      <a href="https://aistudio.google.com/" target="_blank" class="link-action" style="font-size: 0.7rem; text-decoration: none; font-weight: 600; color: #38bdf8;">Get key ↗</a>
+
+  <!-- Settings Tab Bar -->
+  <div style="display: flex; gap: 4px; margin-bottom: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 0;">
+    <button id="settings-tab-apikeys" class="tab-btn active" onclick="switchSettingsTab('apikeys')" style="font-size: 0.78rem; padding: 6px 14px; border-radius: 6px 6px 0 0; margin-bottom: -1px;">API Keys</button>
+    <button id="settings-tab-profile" class="tab-btn" onclick="switchSettingsTab('profile')" style="font-size: 0.78rem; padding: 6px 14px; border-radius: 6px 6px 0 0; margin-bottom: -1px;">My Profile</button>
+  </div>
+
+  <!-- API Keys Tab -->
+  <div id="settings-content-apikeys">
+    <div class="form-group">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <label class="form-label" for="settings-gemini" style="margin-bottom: 0;">Gemini API Key</label>
+        <a href="https://aistudio.google.com/" target="_blank" class="link-action" style="font-size: 0.7rem; text-decoration: none; font-weight: 600; color: #38bdf8;">Get key ↗</a>
+      </div>
+      <input type="text" id="settings-gemini" placeholder="AIzaSy..." />
     </div>
-    <input type="text" id="settings-gemini" placeholder="AIzaSy..." />
-  </div>
 
-  <div class="form-group" style="margin-top: 1rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-      <label class="form-label" for="settings-tavily" style="margin-bottom: 0;">Tavily API Key</label>
-      <a href="https://app.tavily.com/" target="_blank" class="link-action" style="font-size: 0.7rem; text-decoration: none; font-weight: 600; color: #38bdf8;">Get key ↗</a>
+    <div class="form-group" style="margin-top: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+        <label class="form-label" for="settings-tavily" style="margin-bottom: 0;">Tavily API Key</label>
+        <a href="https://app.tavily.com/" target="_blank" class="link-action" style="font-size: 0.7rem; text-decoration: none; font-weight: 600; color: #38bdf8;">Get key ↗</a>
+      </div>
+      <input type="text" id="settings-tavily" placeholder="tvly-..." />
+      <div style="font-size: 0.72rem; color: var(--color-text-muted); margin-top: 4px;">Used for job search and contact discovery.</div>
     </div>
-    <input type="text" id="settings-tavily" placeholder="tvly-..." />
-    <div style="font-size: 0.72rem; color: var(--color-text-muted); margin-top: 4px;">Used for job search and contact discovery.</div>
+
+    <div style="font-size: 0.75rem; color: var(--color-text-secondary); margin-bottom: 1.25rem; line-height: 1.45; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid rgba(255,255,255,0.04); margin-top: 1rem;">
+      💡 <strong>Environment Sourcing</strong>: On startup, the dashboard automatically attempts to detect and load your API keys from a local <code>.env</code> file situated in the same folder. Manual credentials take precedence.
+    </div>
+
+    <div class="actions-bar" style="margin-top: 1.5rem;">
+      <button class="btn btn-primary" onclick="saveSettings()">Save Configuration</button>
+    </div>
   </div>
 
-  <div style="font-size: 0.75rem; color: var(--color-text-secondary); margin-bottom: 1.25rem; line-height: 1.45; background: rgba(255,255,255,0.02); padding: 12px; border-radius: var(--border-radius-sm); border: 1px solid rgba(255,255,255,0.04); margin-top: 1rem;">
-    💡 <strong>Environment Sourcing</strong>: On startup, the dashboard automatically attempts to detect and load your API keys from a local <code>.env</code> file situated in the same folder. Manual credentials take precedence.
-  </div>
+  <!-- My Profile Tab -->
+  <div id="settings-content-profile" style="display: none;">
+    <div class="form-group">
+      <label class="form-label" for="profile-name">Full Name</label>
+      <input type="text" id="profile-name" placeholder="Yashvardhan" />
+    </div>
 
-  <div class="actions-bar" style="margin-top: 1.5rem;">
-    <button class="btn btn-primary" onclick="saveSettings()">Save Configuration</button>
+    <div class="form-group">
+      <label class="form-label" for="profile-location">Location</label>
+      <input type="text" id="profile-location" placeholder="Bangalore, India" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="profile-target-roles">Target Roles <span style="font-weight: 400; color: var(--color-text-muted);">(comma-separated)</span></label>
+      <input type="text" id="profile-target-roles" placeholder="Customer Success, Solutions Engineer, AI Trainer" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="profile-experience">Experience Level</label>
+      <select id="profile-experience">
+        <option value="Fresher (0 yr)">Fresher (0 yr)</option>
+        <option value="0–1 yr">0–1 yr</option>
+        <option value="1–2 yr">1–2 yr</option>
+        <option value="2–3 yr">2–3 yr</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="profile-skills">Key Skills <span style="font-weight: 400; color: var(--color-text-muted);">(comma-separated)</span></label>
+      <textarea id="profile-skills" rows="2" placeholder="Python, SQL, React, LLM prompting" style="width: 100%; resize: vertical; background: var(--color-surface); border: 1px solid rgba(255,255,255,0.1); border-radius: var(--border-radius-sm); color: var(--color-text-primary); padding: 8px 10px; font-size: 0.82rem; font-family: inherit;"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Target Markets</label>
+      <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px;">
+        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--color-text-secondary); cursor: pointer;">
+          <input type="checkbox" id="profile-market-india" value="India" checked style="accent-color: #38bdf8;" /> India
+        </label>
+        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--color-text-secondary); cursor: pointer;">
+          <input type="checkbox" id="profile-market-singapore" value="Singapore" style="accent-color: #38bdf8;" /> Singapore
+        </label>
+        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--color-text-secondary); cursor: pointer;">
+          <input type="checkbox" id="profile-market-uae" value="UAE" style="accent-color: #38bdf8;" /> UAE
+        </label>
+        <label style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--color-text-secondary); cursor: pointer;">
+          <input type="checkbox" id="profile-market-remote" value="Remote" style="accent-color: #38bdf8;" /> Remote
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="profile-linkedin">LinkedIn URL <span style="font-weight: 400; color: var(--color-text-muted);">(optional)</span></label>
+      <input type="text" id="profile-linkedin" placeholder="linkedin.com/in/yashvardhan" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="profile-notice-period">Notice Period</label>
+      <input type="text" id="profile-notice-period" placeholder="Immediate / 30 days" />
+    </div>
+
+    <div class="actions-bar" style="margin-top: 1.5rem;">
+      <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+    </div>
   </div>
 </div>
 
@@ -3274,6 +3348,25 @@ async function restoreFromBackup() {
 let tavilyApiKey = localStorage.getItem("tavily_key") || "";
 let geminiApiKey = localStorage.getItem("gemini_key") || "";
 
+function getUserProfile() {
+  return JSON.parse(localStorage.getItem("user_profile") || "{}");
+}
+
+function buildProfileContext() {
+  const p = getUserProfile();
+  const cv = localStorage.getItem("draft_cv_text") || "";
+  const parts = [];
+  if (p.name) parts.push(`Candidate: ${p.name}`);
+  if (p.location) parts.push(`Location: ${p.location}`);
+  if (p.experience) parts.push(`Experience: ${p.experience}`);
+  if (p.target_roles) parts.push(`Target roles: ${p.target_roles}`);
+  if (p.skills) parts.push(`Key skills: ${p.skills}`);
+  if (p.target_markets?.length) parts.push(`Target markets: ${p.target_markets.join(", ")}`);
+  if (p.notice_period) parts.push(`Notice period: ${p.notice_period}`);
+  if (cv) parts.push(`\nCV summary:\n${cv.slice(0, 600)}`);
+  return parts.join("\n");
+}
+
 // Pre-populated application tracking data matching user screenshot exactly
 const defaultApplications = [
   { company: "BiteSpeed", role: "CSA", date: "1/5", location: "Bangalore", status: "Interview", url: "" },
@@ -3435,6 +3528,7 @@ function openSettings() {
   document.getElementById("settings-panel").style.display = "block";
   document.getElementById("settings-gemini").value = geminiApiKey;
   document.getElementById("settings-tavily").value = tavilyApiKey;
+  loadProfile();
 }
 
 function closeSettings() {
@@ -3450,6 +3544,53 @@ function saveSettings() {
   closeSettings();
   checkApiKeyStatus();
   showToast("Credentials saved!");
+}
+
+function switchSettingsTab(tab) {
+  ["apikeys", "profile"].forEach(t => {
+    document.getElementById("settings-tab-" + t).classList.toggle("active", t === tab);
+    document.getElementById("settings-content-" + t).style.display = t === tab ? "block" : "none";
+  });
+}
+
+function saveProfile() {
+  const markets = ["india", "singapore", "uae", "remote"]
+    .filter(m => document.getElementById("profile-market-" + m).checked)
+    .map(m => document.getElementById("profile-market-" + m).value);
+  const profile = {
+    name: document.getElementById("profile-name").value.trim(),
+    location: document.getElementById("profile-location").value.trim(),
+    target_roles: document.getElementById("profile-target-roles").value.trim(),
+    experience: document.getElementById("profile-experience").value,
+    skills: document.getElementById("profile-skills").value.trim(),
+    target_markets: markets,
+    linkedin_url: document.getElementById("profile-linkedin").value.trim(),
+    notice_period: document.getElementById("profile-notice-period").value.trim()
+  };
+  localStorage.setItem("user_profile", JSON.stringify(profile));
+  showToast("Profile saved ✓");
+}
+
+function loadProfile() {
+  const profile = getUserProfile();
+  if (!profile || !Object.keys(profile).length) return;
+  if (profile.name) document.getElementById("profile-name").value = profile.name;
+  if (profile.location) document.getElementById("profile-location").value = profile.location;
+  if (profile.target_roles) document.getElementById("profile-target-roles").value = profile.target_roles;
+  if (profile.experience) document.getElementById("profile-experience").value = profile.experience;
+  if (profile.skills) document.getElementById("profile-skills").value = profile.skills;
+  if (profile.linkedin_url) document.getElementById("profile-linkedin").value = profile.linkedin_url;
+  if (profile.notice_period) document.getElementById("profile-notice-period").value = profile.notice_period;
+  if (Array.isArray(profile.target_markets)) {
+    ["india", "singapore", "uae", "remote"].forEach(m => {
+      const el = document.getElementById("profile-market-" + m);
+      if (el) el.checked = profile.target_markets.includes(el.value);
+    });
+  }
+}
+
+function getUserProfile() {
+  return JSON.parse(localStorage.getItem("user_profile") || "{}");
 }
 
 // Switch between Primary modules defensively (supports both desktop horizontal tabs and mobile sidebar links)
@@ -5997,10 +6138,9 @@ function jsScannerRender() {
     </div>`;
   }).join("");
 
-  // Fire-and-forget AI scoring (only if key + CV are available)
-  const cvText = localStorage.getItem("draft_cv_text") || "";
-  if (geminiApiKey && cvText) {
-    jsScoreVisibleJobs(renderedJobs, cvText);
+  // Fire-and-forget AI scoring (only if key + profile/CV are available)
+  if (geminiApiKey && buildProfileContext()) {
+    jsScoreVisibleJobs(renderedJobs);
   } else {
     // No CV or key — clear "scoring…" placeholders
     renderedJobs.forEach((_, idx) => {
