@@ -1,0 +1,11 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "weekly"
+    ignore:
+      # glib is a Linux/GTK transitive dep — never compiled in this Windows-only build.
+      # Fix requires >=0.20.0 but Tauri's dep tree caps it at 0.18.5; unresolvable upstream.
+      - dependency-name: "glib"
+        update-types: ["version-update:semver-patch", "version-update:semver-minor", "version-update:semver-major"]
