@@ -6164,6 +6164,97 @@ function jsUseForCV(j) {
   });
 })();
 
+
+const jsIntelCache = new Map();
+
+function jsOpenIntelPanel(company) {
+  document.getElementById("js-intel-company-name").textContent = company;
+  document.getElementById("js-intel-panel").style.transform = "translateX(0)";
+  if (jsIntelCache.has(company)) {
+    document.getElementById("js-intel-content").textContent = jsIntelCache.get(company);
+    return;
+  }
+  document.getElementById("js-intel-content").textContent = "Researching " + company + "…";
+  jsLoadCompanyIntel(company);
+}
+
+function jsCloseIntelPanel() {
+  document.getElementById("js-intel-panel").style.transform = "translateX(100%)";
+}
+
+async function jsLoadCompanyIntel(company) {
+  const tavilyKey = tavilyApiKey;
+  const gemKey = geminiApiKey;
+
+  let context = "";
+
+  if (tavilyKey) {
+    try {
+      const res = await fetch("https://api.tavily.com/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: tavilyKey,
+          query: `${company} company funding headcount tech stack culture 2024 2025`,
+          search_depth: "basic",
+          max_results: 4,
+          days: 90
+        })
+      });
+      const data = await res.json();
+      context = (data.results || []).map(r => r.content || "").join("\n\n").slice(0, 1500);
+    } catch (_) {}
+  }
+
+  if (!gemKey) {
+    document.getElementById("js-intel-content").textContent = context || "Add Gemini API key in Settings for AI-powered company intel.";
+    jsIntelCache.set(company, document.getElementById("js-intel-content").textContent);
+    return;
+  }
+
+  const prompt = `You are a career advisor helping a fresher job seeker research a company before applying.
+
+Company: ${company}
+${context ? `Recent web data:\n${context}\n\n` : ""}
+Write a concise company brief with these sections (use ## headers):
+
+## What They Do
+One paragraph.
+
+## Funding & Scale
+Funding stage, last round, approximate headcount. If unknown, say so.
+
+## Tech Stack
+Key technologies used (from job postings, GitHub, engineering blog if known).
+
+## Why Apply Here
+2–3 genuine reasons this is a good early-career move.
+
+## Watch Out For
+1–2 honest concerns or things to research further (growth stage risks, churn, etc.).
+
+## Interview Tips
+2–3 specific things this company looks for based on their culture/product.
+
+Be specific and direct. If you don't know something, say so briefly rather than guessing.`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gemKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      }
+    );
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response.";
+    document.getElementById("js-intel-content").textContent = text;
+    jsIntelCache.set(company, text);
+  } catch (e) {
+    document.getElementById("js-intel-content").textContent = "Error: " + e.message;
+  }
+}
 </script>
 
 <!-- Follow-up Email Panel -->
@@ -6237,5 +6328,19 @@ async function jsGeneratePrepQuestions(role, company) {
   }
 }
 </script>
+<div id="js-intel-panel" style="
+  position: fixed; right: 0; top: 0; height: 100vh; width: 440px;
+  background: rgba(24,23,21,0.98); border-left: 1px solid rgba(247,244,235,0.08);
+  z-index: 999; padding: 28px; overflow-y: auto;
+  transform: translateX(100%); transition: transform .3s ease;
+  backdrop-filter: blur(20px);
+">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <div style="font-weight:700; font-size:1rem;" id="js-intel-company-name">Company Intel</div>
+    <button onclick="jsCloseIntelPanel()" style="background:none;border:none;color:var(--color-text-muted);font-size:1.2rem;cursor:pointer;">&#x2715;</button>
+  </div>
+  <div id="js-intel-content" style="font-size:.84rem; line-height:1.75; color:var(--color-text-secondary); white-space:pre-wrap;"></div>
+</div>
+
 </body>
 </html>
