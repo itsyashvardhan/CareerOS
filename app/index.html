@@ -5046,12 +5046,12 @@ function editNote(idx) {
 async function generateFollowUp(idx) {
   const app = trackerData[idx];
   if (!geminiApiKey) { showToast("Add Gemini API key in Settings first."); openSettings(); return; }
-  const cv = localStorage.getItem("draft_cv_text") || "";
   const parts = (app.date || "").split("/");
   const appDate = parts.length === 2 ? new Date(`2025-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`) : null;
   const daysSince = appDate ? Math.round((Date.now() - appDate) / 86400000) : 5;
   const prompt = `Write a concise follow-up email for a job application. No fluff, no generic lines.
-CV summary (first 400 chars): ${cv.slice(0, 400)}
+Candidate profile:
+${buildProfileContext()}
 Company: ${app.company} | Role: ${app.role} | Applied ~${daysSince} days ago | Status: ${app.status}
 Write ONLY the email body (no subject). 3–4 sentences max. Mention one specific thing about the role or company showing genuine interest. End with a low-pressure ask for a status update. Sound human, not templated.`;
 
