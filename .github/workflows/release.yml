@@ -104,10 +104,24 @@ jobs:
             [ -f "$f" ] || continue
             [ -f "${f}.sig" ] && { echo "  already signed: $f"; continue; }
             echo "  signing: $f"
-            TAURI_SIGNING_PRIVATE_KEY="$ENCODED_KEY" cargo tauri signer sign \
-              --private-key "$ENCODED_KEY" \
-              --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
-              "$f"
+            # Try with stored password first; fall back to empty password (key may have no passphrase)
+            if TAURI_SIGNING_PRIVATE_KEY="$ENCODED_KEY" cargo tauri signer sign \
+                --private-key "$ENCODED_KEY" \
+                --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
+                "$f" 2>/dev/null; then
+              echo "  signed with stored password"
+            elif TAURI_SIGNING_PRIVATE_KEY="$ENCODED_KEY" cargo tauri signer sign \
+                --private-key "$ENCODED_KEY" \
+                --password "" \
+                "$f" 2>/dev/null; then
+              echo "  signed with empty password"
+            else
+              echo "  ERROR: signing failed — check TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD secrets"
+              TAURI_SIGNING_PRIVATE_KEY="$ENCODED_KEY" cargo tauri signer sign \
+                --private-key "$ENCODED_KEY" \
+                --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
+                "$f"
+            fi
           done
 
       - name: Upload .sig file
