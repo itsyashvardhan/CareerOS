@@ -173,21 +173,21 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          # Write the full minisign key file to disk (it has a header line with spaces,
-          # so --private-key "$VAR" fails base64 decode; --private-key-path works correctly)
-          printf '%s\n' "$TAURI_SIGNING_PRIVATE_KEY" > /tmp/tauri.key
+          # The secret is the full minisign file (header + base64 key).
+          # tauri signer sign --private-key flag base64-decodes the raw string and chokes
+          # on the "untrusted comment:" header (contains spaces).
+          # Strip the header so the env var contains only the base64 key line.
+          CLEAN_KEY=$(printf '%s\n' "$TAURI_SIGNING_PRIVATE_KEY" | grep -v '^untrusted comment' | tr -d '\r\n ')
           cd dist
           for f in *.nsis.zip *.app.tar.gz *.AppImage.tar.gz; do
             [ -f "$f" ] || continue
             [ -f "${f}.sig" ] && { echo "  already signed: $f"; continue; }
             echo "  signing: $f"
-            # Blank the env var for this invocation so tauri-cli doesn't conflict with --private-key-path
-            TAURI_SIGNING_PRIVATE_KEY="" cargo tauri signer sign \
-              --private-key-path /tmp/tauri.key \
+            TAURI_SIGNING_PRIVATE_KEY="$CLEAN_KEY" cargo tauri signer sign \
+              --private-key "$CLEAN_KEY" \
               --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
               "$f"
           done
-          rm -f /tmp/tauri.key
 
       - name: Upload any new .sig files
         run: |
