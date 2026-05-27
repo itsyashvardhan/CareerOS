@@ -3512,6 +3512,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderBookmarkedContacts();
   spawnMascotBottomRight();
   octoSetState("idle");
+  startOctopusEngine();
 
   // Show Tauri window now — first paint is ready, no white flash
   if (window.__TAURI__?.window) {
@@ -6814,8 +6815,7 @@ Key technologies used (from job postings, GitHub, engineering blog if known).
 ## Interview Tips
 2–3 specific things this company looks for based on their culture/product.
 
-The candidate is: ${buildProfileContext().split('
-').slice(0,4).join(', ')}
+The candidate is: ${buildProfileContext().split('\n').slice(0,4).join(', ')}
 Tailor the "Why Apply Here" and "Interview Tips" sections specifically to this candidate's background.
 
 Be specific and direct. If you don't know something, say so briefly rather than guessing.`;
@@ -7031,10 +7031,7 @@ async function jsGeneratePrepQuestions(role, company) {
     document.getElementById("js-prep-content").textContent = "Add Gemini API key in Settings to use Interview Prep.";
     return;
   }
-  const prompt = "You are a senior interviewer at " + company + ". Generate interview prep for a candidate applying for: " + role + ".
-
-Candidate profile:
-" + buildProfileContext() + "\n\nProduce exactly this structure:\n## Likely Questions (8-10)\nFor each: the question, then a concise model answer tailored to this CV and role.\n\n## Red Flags to Address\n2-3 likely weaknesses based on the CV vs role, with how to frame them positively.\n\n## Questions to Ask Them\n3 smart questions the candidate should ask the interviewer.\n\nBe specific to " + company + "'s product/market if known. Be direct, no filler.";
+  const prompt = `You are a senior interviewer at ${company}. Generate interview prep for a candidate applying for: ${role}.\n\nCandidate profile:\n${buildProfileContext()}\n\nProduce exactly this structure:\n## Likely Questions (8-10)\nFor each: the question, then a concise model answer tailored to this CV and role.\n\n## Red Flags to Address\n2-3 likely weaknesses based on the CV vs role, with how to frame them positively.\n\n## Questions to Ask Them\n3 smart questions the candidate should ask the interviewer.\n\nBe specific to ${company}'s product/market if known. Be direct, no filler.`;
 
   try {
     const res = await fetch(
