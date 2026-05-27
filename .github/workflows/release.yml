@@ -53,20 +53,27 @@ jobs:
           prerelease: false
           args: --bundles nsis
 
-      - name: Rename and upload NSIS exe
+      - name: Rename and upload NSIS exe + update bundle
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
           $ver = $env:TAG.TrimStart('v')
-          $src = "src-tauri/target/release/bundle"
+          $src = "src-tauri/target/release/bundle/nsis"
 
-          $nsis = Get-ChildItem "$src/nsis" -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          # Upload installer (.exe)
+          $nsis = Get-ChildItem "$src" -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($nsis) {
             $dest = "CareerOS-$ver-Windows-x64.exe"
             Copy-Item $nsis.FullName $dest
             gh release upload $env:TAG $dest --clobber
+          }
+
+          # Upload update bundle (.nsis.zip) for auto-updater signing
+          $zip = Get-ChildItem "$src" -Filter "*.nsis.zip" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($zip) {
+            gh release upload $env:TAG $zip.FullName --clobber
           }
 
   # ── Finalize updater: sign .nsis.zip + generate latest.json ───────────────
