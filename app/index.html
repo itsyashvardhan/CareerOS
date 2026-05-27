@@ -4691,6 +4691,9 @@ function renderTracker() {
                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
              </button>`
           : ''}
+        <button class="action-icon-btn" onclick="generateFollowUp(${idx})" title="Draft follow-up email" style="color:var(--color-text-muted);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+        </button>
         <button class="action-icon-btn" onclick="deleteTrackerRow(${idx})" title="Delete Application">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2M10 11v6M14 11v6"/></svg>
         </button>
@@ -4835,6 +4838,39 @@ function editNote(idx) {
   trackerData[idx].note = val.trim();
   localStorage.setItem("applications_tracker", JSON.stringify(trackerData));
   renderTracker();
+}
+
+async function generateFollowUp(idx) {
+  const app = trackerData[idx];
+  if (!geminiApiKey) { showToast("Add Gemini API key in Settings first."); openSettings(); return; }
+  const cv = localStorage.getItem("draft_cv_text") || "";
+  const parts = (app.date || "").split("/");
+  const appDate = parts.length === 2 ? new Date(`2025-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`) : null;
+  const daysSince = appDate ? Math.round((Date.now() - appDate) / 86400000) : 5;
+  const prompt = `Write a concise follow-up email for a job application. No fluff, no generic lines.
+CV summary (first 400 chars): ${cv.slice(0, 400)}
+Company: ${app.company} | Role: ${app.role} | Applied ~${daysSince} days ago | Status: ${app.status}
+Write ONLY the email body (no subject). 3–4 sentences max. Mention one specific thing about the role or company showing genuine interest. End with a low-pressure ask for a status update. Sound human, not templated.`;
+
+  const panel = document.getElementById("js-followup-panel");
+  const content = document.getElementById("js-followup-content");
+  document.getElementById("js-followup-title").textContent = `Follow-up — ${app.role} @ ${app.company}`;
+  content.textContent = "Drafting…";
+  panel.style.transform = "translateX(0)";
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
+      { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) }
+    );
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response.";
+    content.textContent = text;
+  } catch (e) { content.textContent = "Error: " + e.message; }
+}
+
+function closeFollowUpPanel() {
+  document.getElementById("js-followup-panel").style.transform = "translateX(100%)";
 }
 
 // Keep legacy — was called in old code path
@@ -6129,6 +6165,25 @@ function jsUseForCV(j) {
 })();
 
 </script>
+
+<!-- Follow-up Email Panel -->
+<div id="js-followup-panel" style="
+  position:fixed; right:0; top:0; height:100vh; width:440px;
+  background:rgba(24,23,21,0.98); border-left:1px solid rgba(247,244,235,0.08);
+  z-index:998; padding:28px; overflow-y:auto;
+  transform:translateX(100%); transition:transform .3s ease;
+  backdrop-filter:blur(20px);
+">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <div style="font-weight:700; font-size:.95rem;" id="js-followup-title">Follow-up Email</div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button onclick="navigator.clipboard.writeText(document.getElementById('js-followup-content').textContent).then(()=>showToast('Copied!'))"
+        style="padding:5px 12px; border-radius:7px; background:rgba(204,104,73,0.15); border:1px solid rgba(204,104,73,0.3); color:var(--accent-indigo); font-size:.75rem; cursor:pointer;">Copy</button>
+      <button onclick="closeFollowUpPanel()" style="background:none;border:none;color:var(--color-text-muted);font-size:1.2rem;cursor:pointer;">✕</button>
+    </div>
+  </div>
+  <div id="js-followup-content" style="font-size:.84rem; line-height:1.75; color:var(--color-text-secondary); white-space:pre-wrap;"></div>
+</div>
 
 </body>
 </html>
