@@ -32,12 +32,16 @@ pub fn run() {
             }
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                match check_for_update(&handle).await {
-                    Ok(Some(version)) => {
-                        let _ = handle.emit("update-available", version);
+                loop {
+                    match check_for_update(&handle).await {
+                        Ok(Some(version)) => {
+                            let _ = handle.emit("update-available", version);
+                            break;
+                        }
+                        Ok(None) => {}
+                        Err(e) => eprintln!("[updater] check failed: {e}"),
                     }
-                    Ok(None) => {}
-                    Err(e) => eprintln!("[updater] check failed: {e}"),
+                    tokio::time::sleep(std::time::Duration::from_secs(900)).await;
                 }
             });
             Ok(())
