@@ -41,17 +41,13 @@ jobs:
           RAW_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          # Extract only the base64-encoded secret key line, discarding the 'untrusted comment' header
-          $lines = $env:RAW_KEY -split '\r?\n'
-          $cleanKey = ""
-          foreach ($line in $lines) {
-            $trimmed = $line.Trim()
-            if ($trimmed -and $trimmed -notlike "untrusted comment*") {
-              $cleanKey = $trimmed
-              break
-            }
+          # Normalize newlines to Unix LF and ensure trailing newline is kept for minisign parsing
+          $cleanKey = $env:RAW_KEY.Replace("`r`n", "`n").Replace("`r", "`n")
+          if (!$cleanKey.EndsWith("`n")) {
+            $cleanKey += "`n"
           }
-          $env:TAURI_SIGNING_PRIVATE_KEY = $cleanKey
+          $bytes = [System.Text.Encoding]::UTF8.GetBytes($cleanKey)
+          $env:TAURI_SIGNING_PRIVATE_KEY = [Convert]::ToBase64String($bytes)
           tauri build --bundles nsis
       - name: Upload installer, update bundle, and latest.json
         shell: pwsh
