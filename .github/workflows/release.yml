@@ -35,11 +35,23 @@ jobs:
       - name: Install Tauri CLI
         run: npm install -g @tauri-apps/cli@v2
 
+      - name: Write signing key to file
+        shell: pwsh
+        env:
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          $env:SIGNING_KEY | Out-File -FilePath "src-tauri/signing.key" -Encoding ascii
+
       - name: Build Tauri app (NSIS and updater)
         run: tauri build --bundles nsis
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ github.workspace }}/src-tauri/signing.key
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Delete signing key file
+        shell: pwsh
+        run: |
+          Remove-Item -Path "src-tauri/signing.key" -Force -ErrorAction SilentlyContinue
       - name: Upload installer, update bundle, and latest.json
         shell: pwsh
         env:
