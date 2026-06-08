@@ -36,7 +36,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgyMTAxQTBFMEYyNkZDQjYKUldTMi9DWVBEaG9RZ2h2ckpwcW9QWktJS05pZmpqdzZTY3U1cEg0dVJQWWFuNmQxTmE5RnQ0ajQK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFBOEEwNjc1MzhCQzdGOTIKUldTU2Y3dzRkUWFLcXE1NWpvckNoenlzc1VKOXlGdThycGhvN2d2bHJyWW1LZVhJMFlNb3FjTU4K",
       "endpoints": [
         "https://github.com/itsyashvardhan/CareerOS/releases/latest/download/latest.json"
       ]
