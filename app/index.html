@@ -7,7 +7,7 @@
 
   <!-- PWA: cross-platform installable app meta -->
   <meta name="application-name" content="CareerOS">
-  <meta name="description" content="CareerOS — AI-powered job application toolkit. CV Engine, Outreach Finder, Tracker Board, and Job Search in one app.">
+  <meta name="description" content="CareerOS — job application toolkit. CV Engine, Outreach Finder, Tracker Board, and Job Search in one app.">
   <meta name="theme-color" content="#181715">
   <meta name="msapplication-TileColor" content="#181715">
   <meta name="mobile-web-app-capable" content="yes">
@@ -2058,10 +2058,7 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
         <span>Job Scanner</span>
       </button>
-      <button id="sidemenu-skill-gaps" class="sidebar-link" onclick="switchModule('skill-gaps')">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
-        <span>Skill Gaps</span>
-      </button>
+
       <button id="sidemenu-network-graph" class="sidebar-link" onclick="switchModule('network-graph')">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         <span>Network</span>
@@ -2108,7 +2105,6 @@
       <button id="tab-app-tracker" class="module-tab" onclick="switchModule('app-tracker')">Tracker Board</button>
       <button id="tab-job-search" class="module-tab" onclick="switchModule('job-search')">Job Search</button>
       <button id="tab-job-scanner" class="module-tab" onclick="switchModule('job-scanner')">Job Scanner</button>
-      <button id="tab-skill-gaps" class="module-tab" onclick="switchModule('skill-gaps')">Skill Gaps</button>
       <button id="tab-network-graph" class="module-tab" onclick="switchModule('network-graph')">Network</button>
     </nav>
     
@@ -2333,9 +2329,17 @@
           <div class="panel-title">1. Find Regional LinkedIn Contacts</div>
           
           <div class="form-group">
-            <label class="form-label" for="ref-company-input">Target Company Name</label>
+            <div style="display: flex; gap: 10px;">
+              <div style="flex: 2;">
+                <label class="form-label" for="ref-company-input">Target Company Name</label>
+              </div>
+              <div style="flex: 1; max-width: 250px;">
+                <label class="form-label" for="ref-country-input">Target Country (Optional)</label>
+              </div>
+            </div>
             <div class="referral-search-box">
               <input type="text" id="ref-company-input" placeholder="e.g. MongoDB, Freshworks, Postman, Grab..." />
+              <input type="text" id="ref-country-input" placeholder="e.g. India, Singapore" style="max-width: 250px;" />
               <button class="btn btn-primary" onclick="searchReferrals()" id="btn-search-referrals">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                 Find Hiring Managers
@@ -2790,24 +2794,7 @@
   </div>
 </div>
 
-<!-- MODULE 6: Skill Gap Dashboard -->
-<div id="module-skill-gaps" class="module-view">
-  <div style="padding: 0 2px 24px;">
-    <div style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:20px;">
-      <div>
-        <h2 style="font-size:1.35rem; font-weight:700; color:var(--color-text-primary); margin:0 0 4px;">Skill Gap Dashboard</h2>
-        <p style="font-size:0.82rem; color:var(--color-text-muted); margin:0;">Top skills missing across your scored jobs — ranked by frequency</p>
-      </div>
-      <button onclick="renderSkillGaps()" style="padding:8px 16px; background:var(--accent-indigo); color:#fff; border:none; border-radius:8px; font-size:0.82rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:6px;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-        Refresh
-      </button>
-    </div>
-    <div id="skill-gaps-container"></div>
-  </div>
-</div>
-
-<div id="module-network-graph" class="module-view" style="display:none;">
+<div id="module-network-graph" class="module-view">
   <div style="padding:24px 28px; border-bottom:1px solid rgba(247,244,235,0.06);">
     <h2 style="font-size:1.1rem; font-weight:700; margin:0 0 4px;">Referral Network</h2>
     <p style="color:var(--color-text-muted); font-size:.82rem; margin:0;">Your bookmarked contacts visualized. Click any node to draft outreach.</p>
@@ -3711,7 +3698,7 @@ function showUpdateToast_profile() {
     box-shadow:0 8px 32px rgba(0,0,0,0.5); max-width:440px;
   `;
   el.innerHTML = `
-    <span>👤 Set up your profile to personalize all AI features</span>
+    <span>👤 Set up your profile to personalize your experience</span>
     <button onclick="openSettings(); this.closest('#profile-onboard-toast').remove();"
       style="padding:6px 14px; border-radius:8px; background:var(--accent-indigo); color:#fff; border:none; font-size:.82rem; cursor:pointer; white-space:nowrap;">Set Up</button>
     <button onclick="localStorage.setItem('profile_prompt_dismissed','1'); this.closest('#profile-onboard-toast').remove();"
@@ -3778,7 +3765,6 @@ function switchModule(moduleName) {
   octoOnModuleSwitch(moduleName);
 
   // Auto-render skill gaps when switching to that module
-  if (moduleName === 'skill-gaps') renderSkillGaps();
   if (moduleName === 'network-graph') renderNetworkGraph();
 }
 
@@ -4640,20 +4626,29 @@ function copyRewrite() {
 
 // Search LinkedIn Hiring Managers using Tavily Search API with Strict Current-Company Filtering
 async function searchReferrals() {
+  if (!tavilyApiKey) {
+    alert("Tavily API Key is not configured. Please configure it in the 'API Settings' panel.");
+    openSettings();
+    return;
+  }
+
   octoOnSearch();
   const companyInput = document.getElementById("ref-company-input").value.trim();
+  const countryInput = document.getElementById("ref-country-input").value.trim();
   if (!companyInput) {
     alert("Please enter a target company name!");
     return;
   }
-
 
   const btn = document.getElementById("btn-search-referrals");
   btn.textContent = "Scanning...";
   btn.disabled = true;
 
   // Target hiring managers/leads at the company — keep query short, domain-filter via Tavily param
-  const query = `"${companyInput}" recruiter OR "hiring manager" OR "engineering manager" OR "talent acquisition" OR "engineering lead"`;
+  let query = `"${companyInput}" recruiter OR "hiring manager" OR "engineering manager" OR "talent acquisition" OR "engineering lead"`;
+  if (countryInput) {
+    query += ` "${countryInput}"`;
+  }
 
   try {
     const response = await fetch("https://api.tavily.com/search", {
@@ -4679,6 +4674,7 @@ async function searchReferrals() {
     
     // Strict Filtering: Ensure target company match, filter ex-employees, and exclude C-Suite
     const normalizedCompany = companyInput.toLowerCase();
+    const normalizedCountry = countryInput.toLowerCase();
     const filteredResults = [];
 
     for (const contact of results) {
@@ -4687,6 +4683,9 @@ async function searchReferrals() {
 
       // Must mention the target company in the title / current headline
       const mentionsCompany = titleLower.includes(normalizedCompany);
+
+      // If country is specified, the contact must mention it in title or content
+      const mentionsCountry = !countryInput || titleLower.includes(normalizedCountry) || contentLower.includes(normalizedCountry);
 
       // Must NOT be a C-Suite executive or founder (exclude CEO, CTO, COO, VP, Chief, Founder, President)
       const isCSuite = titleLower.includes("ceo") || 
@@ -4711,7 +4710,7 @@ async function searchReferrals() {
                    contentLower.includes("past: " + normalizedCompany) ||
                    contentLower.includes("previous: " + normalizedCompany);
 
-      if (mentionsCompany && !isEx && !isCSuite) {
+      if (mentionsCompany && !isEx && !isCSuite && mentionsCountry) {
         filteredResults.push(contact);
       }
     }
@@ -5795,7 +5794,7 @@ function _pwaInjectManifest() {
   const manifest = {
     name: "CareerOS",
     short_name: "CareerOS",
-    description: "AI-powered job application toolkit — CV Engine, Outreach, Tracker, Job Search.",
+    description: "Job application toolkit — CV Engine, Outreach, Tracker, Job Search.",
     start_url: "./",
     scope: "./",
     display: "standalone",
@@ -6054,100 +6053,7 @@ let jsActiveSourceFilters = new Set();
 let jsSavedJobs = JSON.parse(localStorage.getItem("js_saved_jobs") || "[]");
 const jsScoreCache = new Map(); // key: "title|company" → {score, reason}
 
-// ── Skill Gap Dashboard ──────────────────────────────────────────────────────
-const SKILL_RESOURCE_MAP = {
-  'sql': 'https://www.coursera.org/learn/sql-for-data-science',
-  'python': 'https://www.freecodecamp.org/learn/scientific-computing-with-python/',
-  'excel': 'https://support.microsoft.com/excel',
-  'salesforce': 'https://trailhead.salesforce.com/',
-  'react': 'https://react.dev/learn',
-  'javascript': 'https://javascript.info/',
-  'typescript': 'https://www.typescriptlang.org/docs/',
-  'java': 'https://www.coursera.org/learn/java-programming',
-  'c++': 'https://www.learncpp.com/',
-  'machine learning': 'https://www.coursera.org/learn/machine-learning',
-  'data analysis': 'https://www.coursera.org/learn/data-analysis-with-python',
-  'tableau': 'https://www.tableau.com/learn/training',
-  'power bi': 'https://learn.microsoft.com/en-us/power-bi/',
-  'aws': 'https://aws.amazon.com/training/',
-  'docker': 'https://docs.docker.com/get-started/',
-  'git': 'https://learngitbranching.js.org/',
-  'node': 'https://nodejs.org/en/learn',
-  'nodejs': 'https://nodejs.org/en/learn',
-  'figma': 'https://www.figma.com/resources/learn-design/',
-  'communication': 'https://www.coursera.org/learn/wharton-communication-skills',
-};
-
-function getSkillResource(skill) {
-  const key = skill.toLowerCase().trim();
-  if (SKILL_RESOURCE_MAP[key]) return SKILL_RESOURCE_MAP[key];
-  for (const [k, v] of Object.entries(SKILL_RESOURCE_MAP)) {
-    if (key.includes(k) || k.includes(key)) return v;
-  }
-  return `https://www.coursera.org/search?query=${encodeURIComponent(skill)}`;
-}
-
-function renderSkillGaps() {
-  const container = document.getElementById('skill-gaps-container');
-  if (!container) return;
-
-  if (jsScoreCache.size === 0) {
-    container.innerHTML = `<div style="text-align:center; padding:48px 24px; color:var(--color-text-muted); font-size:0.88rem; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:12px;">
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 12px; display:block; opacity:0.35;"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
-      Run job match scoring in the Scanner tab first. Scored jobs will populate your skill gaps here.
-    </div>`;
-    return;
-  }
-
-  // Aggregate missing_skills across all cached scores
-  const freq = new Map();
-  for (const val of jsScoreCache.values()) {
-    const skills = val.missing_skills || [];
-    for (const s of skills) {
-      if (!s || !s.trim()) continue;
-      const norm = s.trim();
-      freq.set(norm, (freq.get(norm) || 0) + 1);
-    }
-  }
-
-  if (freq.size === 0) {
-    container.innerHTML = `<div style="text-align:center; padding:48px 24px; color:var(--color-text-muted); font-size:0.88rem; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:12px;">No missing skills found in your scored jobs. Great coverage!</div>`;
-    return;
-  }
-
-  // Sort descending, take top 15
-  const sorted = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15);
-
-  // Load persisted statuses
-  let statusMap = {};
-  try { statusMap = JSON.parse(localStorage.getItem('skill_gap_status') || '{}'); } catch(e) {}
-
-  const rows = sorted.map(([skill, count]) => {
-    const status = statusMap[skill] || null;
-    const resourceUrl = getSkillResource(skill);
-    const learningActive = status === 'learning';
-    const doneActive = status === 'done';
-    return `<div style="display:flex; align-items:center; gap:12px; padding:10px 14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:9px; margin-bottom:8px; flex-wrap:wrap;">
-      <span style="flex:1; min-width:120px; font-size:0.88rem; font-weight:600; color:var(--color-text-primary);">${skill}</span>
-      <span style="background:rgba(248,113,113,0.12); border:1px solid rgba(248,113,113,0.25); color:#f87171; font-size:11px; padding:2px 8px; border-radius:5px; white-space:nowrap;">×${count}</span>
-      <a href="${resourceUrl}" target="_blank" rel="noopener" style="color:var(--accent-indigo); font-size:.78rem; text-decoration:underline; white-space:nowrap;">Learn →</a>
-      <div style="display:flex; gap:6px; margin-left:auto;">
-        <button onclick="setSkillStatus('${skill.replace(/'/g,"\\'")}','learning')" style="padding:3px 12px; border-radius:99px; font-size:11px; font-weight:600; cursor:pointer; border:1px solid; transition:all .15s; ${learningActive ? 'background:#4f46e5; border-color:#4f46e5; color:#fff;' : 'background:transparent; border-color:rgba(79,70,229,0.4); color:#a5b4fc;'}">
-          ${learningActive ? '● Learning' : 'Mark Learning'}
-        </button>
-        <button onclick="setSkillStatus('${skill.replace(/'/g,"\\'")}','done')" style="padding:3px 12px; border-radius:99px; font-size:11px; font-weight:600; cursor:pointer; border:1px solid; transition:all .15s; ${doneActive ? 'background:#16a34a; border-color:#16a34a; color:#fff;' : 'background:transparent; border-color:rgba(22,163,74,0.4); color:#86efac;'}">
-          ${doneActive ? '✓ Done' : 'Mark Done'}
-        </button>
-      </div>
-    </div>`;
-  }).join('');
-
-  container.innerHTML = `<div style="font-size:0.75rem; color:var(--color-text-muted); margin-bottom:12px;">${freq.size} unique skills found across ${jsScoreCache.size} scored jobs. Showing top ${sorted.length}.</div>${rows}`;
-}
-
-function setSkillStatus(skill, status) {
-  let statusMap = {};
-  try { statusMap = JSON.parse(localStorage.getItem('skill_gap_status') || '{}'); } catch(e) {}
+ catch(e) {}
   if (statusMap[skill] === status) {
     delete statusMap[skill]; // toggle off
   } else {
@@ -6308,20 +6214,38 @@ async function jsToggleNotifications(btn) {
     return;
   }
   if (!("Notification" in window)) {
-    alert("Desktop notifications are not supported in this view.");
+    jsNotificationsEnabled = true;
+    btn.textContent = "🔔 Notify on (In-App)";
+    btn.classList.add("active");
+    showToast("OS notifications not supported. Enrolled in In-App notifications instead.");
     return;
   }
-  const perm = Notification.permission === "granted"
-    ? "granted"
-    : await Notification.requestPermission();
-  if (perm !== "granted") {
-    alert("Notification permission denied. Please allow notifications for this app.");
+  
+  try {
+    const perm = Notification.permission === "granted"
+      ? "granted"
+      : await Notification.requestPermission();
+    if (perm !== "granted") {
+      jsNotificationsEnabled = true;
+      btn.textContent = "🔔 Notify on (In-App)";
+      btn.classList.add("active");
+      showToast("OS permission denied. Enrolling in In-App notifications instead.");
+      jsAllJobs.forEach(j => jsSeenJobKeys.add(`${j.title.toLowerCase()}|${j.company.toLowerCase()}`));
+      return;
+    }
+  } catch (e) {
+    console.warn("Notification permission request failed, falling back to In-App:", e);
+    jsNotificationsEnabled = true;
+    btn.textContent = "🔔 Notify on (In-App)";
+    btn.classList.add("active");
+    showToast("OS notification request blocked. Enrolling in In-App notifications instead.");
+    jsAllJobs.forEach(j => jsSeenJobKeys.add(`${j.title.toLowerCase()}|${j.company.toLowerCase()}`));
     return;
   }
+
   jsNotificationsEnabled = true;
   btn.textContent = "🔔 Notify on";
   btn.classList.add("active");
-  // Seed seen keys from current results so we only alert on NEW findings
   jsAllJobs.forEach(j => jsSeenJobKeys.add(`${j.title.toLowerCase()}|${j.company.toLowerCase()}`));
 }
 
@@ -6334,17 +6258,27 @@ function jsNotifyNewJobs(jobs) {
     return true;
   });
   if (fresh.length === 0) return;
-  if (fresh.length === 1) {
-    const j = fresh[0];
-    new Notification(`New listing: ${j.title}`, {
-      body: `${j.company} · ${j.location || "Location TBD"}`,
-      icon: "",
-    });
-  } else {
-    new Notification(`${fresh.length} new job listings found`, {
-      body: fresh.slice(0, 3).map(j => `${j.title} @ ${j.company}`).join("\n"),
-      icon: "",
-    });
+
+  const msg = fresh.length === 1
+    ? `🔔 <strong>New listing:</strong> ${fresh[0].title} at ${fresh[0].company}`
+    : `🔔 <strong>${fresh.length} new listings:</strong> ${fresh.slice(0, 2).map(j => j.title).join(", ")}...`;
+  showToast(msg);
+
+  try {
+    if ("Notification" in window && Notification.permission === "granted") {
+      if (fresh.length === 1) {
+        const j = fresh[0];
+        new Notification(`New listing: ${j.title}`, {
+          body: `${j.company} · ${j.location || "Location TBD"}`,
+        });
+      } else {
+        new Notification(`${fresh.length} new job listings found`, {
+          body: fresh.slice(0, 3).map(j => `${j.title} @ ${j.company}`).join("\n"),
+        });
+      }
+    }
+  } catch (e) {
+    console.error("OS Notification failed:", e);
   }
 }
 
@@ -6846,7 +6780,7 @@ async function jsLoadCompanyIntel(company) {
   }
 
   if (!gemKey) {
-    document.getElementById("js-intel-content").textContent = context || "Add Gemini API key in Settings for AI-powered company intel.";
+    document.getElementById("js-intel-content").textContent = context || "Add Gemini API key in Settings for company intel.";
     jsIntelCache.set(company, document.getElementById("js-intel-content").textContent);
     return;
   }
@@ -7225,6 +7159,11 @@ If data is for Singapore/UAE, use SGD/AED. Be specific and data-driven.`;
 function openOutreachForContact(contact) {
   selectedContact = contact;
   switchModule('referral-outreach');
+  const panel = document.getElementById("outreach-config-panel");
+  if (panel) {
+    panel.style.display = "block";
+    panel.scrollIntoView({ behavior: 'smooth' });
+  }
   showToast('Drafting outreach for ' + contact.name);
 }
 
