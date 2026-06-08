@@ -36,7 +36,7 @@ jobs:
         run: npm install -g @tauri-apps/cli@v2
 
       - name: Build Tauri app (NSIS and updater)
-        run: tauri build --bundles nsis,updater
+        run: tauri build --bundles nsis
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
