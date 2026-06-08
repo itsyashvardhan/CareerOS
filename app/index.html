@@ -6053,15 +6053,6 @@ let jsActiveSourceFilters = new Set();
 let jsSavedJobs = JSON.parse(localStorage.getItem("js_saved_jobs") || "[]");
 const jsScoreCache = new Map(); // key: "title|company" → {score, reason}
 
- catch(e) {}
-  if (statusMap[skill] === status) {
-    delete statusMap[skill]; // toggle off
-  } else {
-    statusMap[skill] = status;
-  }
-  localStorage.setItem('skill_gap_status', JSON.stringify(statusMap));
-  renderSkillGaps();
-}
 // ────────────────────────────────────────────────────────────────────────────
 
 function jsToggleSave(key, title, company, url) {

@@ -51,7 +51,7 @@ jobs:
             **Auto-update**: existing installs will be notified automatically.
           releaseDraft: false
           prerelease: false
-          args: --bundles nsis
+          args: --bundles nsis,updater
 
       - name: Upload installer, update bundle, and latest.json
         shell: pwsh
