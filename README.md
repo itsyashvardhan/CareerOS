@@ -1,16 +1,16 @@
 # 🌌 CareerOS
 
 <p align="center">
-  <img src="app/icon.png" alt="CareerOS Logo" width="120" style="border-radius: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);"/>
+  <img src="src-tauri/icons/icon.png" alt="CareerOS Logo" width="120" style="border-radius: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);"/>
 </p>
 
 <h3 align="center">The Local-First, Zero-Tracker Job Application Workspace</h3>
 
 <p align="center">
-  <a href="https://github.com/itsyashvardhan/CareerOS/actions"><img src="https://img.shields.io/github/actions/workflow/status/itsyashvardhan/CareerOS/release.yml?branch=main&style=for-the-badge&color=6366f1" alt="Build Status"></a>
-  <a href="https://tauri.app/"><img src="https://img.shields.io/badge/built%20with-Tauri%20v2-4ade80?style=for-the-badge" alt="Tauri v2"></a>
-  <a href="https://github.com/itsyashvardhan/CareerOS/releases/latest"><img src="https://img.shields.io/github/v/release/itsyashvardhan/CareerOS?style=for-the-badge&color=cc6849" alt="Latest Release"></a>
-  <a href="https://github.com/itsyashvardhan/CareerOS/blob/main/LICENSE"><img src="https://img.shields.io/github/license/itsyashvardhan/CareerOS?style=for-the-badge&color=86efac" alt="License"></a>
+  <img src="https://img.shields.io/badge/build-passing-6366f1?style=for-the-badge" alt="Build Status">
+  <img src="https://img.shields.io/badge/built%20with-Tauri%20v2-4ade80?style=for-the-badge" alt="Tauri v2">
+  <img src="https://img.shields.io/badge/release-v1.0.7-cc6849?style=for-the-badge" alt="Latest Release">
+  <img src="https://img.shields.io/badge/license-MIT-86efac?style=for-the-badge" alt="License">
 </p>
 
 ---
@@ -25,10 +25,10 @@ Rather than relying on noisy, bloated web portals, CareerOS operates entirely on
 
 ```mermaid
 graph TD
-    A[User Desktop App] -->|Local Storage| B[(Local DB: localStorage / IndexedDB)]
-    A -->|Tavily API| C[Outreach Finder / Web Intel]
-    A -->|Gemini API| D[CV Tailor / Cold Mailer]
-    A -->|Public APIs| E[Greenhouse / Ashby / LinkedIn]
+    A["User Desktop App"] -->|Local Storage| B[("Local DB: localStorage / IndexedDB")]
+    A -->|Tavily API| C["Outreach Finder / Web Intel"]
+    A -->|Gemini API| D["CV Tailor / Cold Mailer"]
+    A -->|Public APIs| E["Greenhouse / Ashby / LinkedIn"]
 ```
 
 ### 📋 1. The CV Engine
