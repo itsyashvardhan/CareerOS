@@ -1,6 +1,6 @@
 {
   "productName": "CareerOS",
-  "version": "1.1.0",
+  "version": "0.1.0",
   "identifier": "com.careeros.app",
   "build": {
     "frontendDist": "../app"
@@ -36,7 +36,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhEMUVGQjlCNTNBRTI2M0MKUldROEpxNVRtL3NlamFQRVdaZzlrSHFwREkrMGJ4K3BLbThITW5xb2czM3Z1M0M1cUVrRkJPWDQK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgyMTAxQTBFMEYyNkZDQjYKUldTMi9DWVBEaG9RZ2h2ckpwcW9QWktJS05pZmpqdzZTY3U1cEg0dVJQWWFuNmQxTmE5RnQ0ajQK",
       "endpoints": [
         "https://github.com/itsyashvardhan/CareerOS/releases/latest/download/latest.json"
       ]
