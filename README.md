@@ -4,7 +4,7 @@
   <img src="src-tauri/icons/icon.png" alt="CareerOS Logo" width="120" style="border-radius: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);"/>
 </p>
 
-<h3 align="center">The Local-First, Zero-Tracker Job Application Workspace</h3>
+<h3 align="center">The Local-First, Zero-Tracker Career Workspace</h3>
 
 <p align="center">
   <img src="https://img.shields.io/badge/build-passing-6366f1?style=for-the-badge" alt="Build Status">
